@@ -11,9 +11,10 @@ type TeamMember struct {
 	IsActive bool   `json:"is_active"`
 }
 
-type User struct {
-	UserID   string `json:"user_id"`
-	Username string `json:"username"`
-	TeamName string `json:"team_name"`
-	IsActive bool   `json:"is_active"`
+func Get(TeamName string) (Team, error) {
+	return Team{}, nil
+}
+
+func Add(Team Team) error {
+	return nil
 }
