@@ -1,6 +1,12 @@
 package users
 
-import pullrequest "github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/pullRequest"
+import (
+	"errors"
+
+	pullrequest "github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/pullRequest"
+)
+
+var UserCache map[string]User = make(map[string]User)
 
 type User struct {
 	UserID   string `json:"user_id"`
@@ -20,9 +26,16 @@ type UserRequests struct {
 }
 
 func GetPR(UserID string) UserRequests {
+
 	return UserRequests{}
 }
 
 func SetActive(bindUser UserActivity) (User, error) {
-	return User{}, nil
+	if _, ok := UserCache[bindUser.UserID]; !ok {
+		return User{}, errors.New("resource not found")
+	}
+	user := UserCache[bindUser.UserID]
+	user.IsActive = bindUser.IsActive
+	UserCache[bindUser.UserID] = user
+	return user, nil
 }

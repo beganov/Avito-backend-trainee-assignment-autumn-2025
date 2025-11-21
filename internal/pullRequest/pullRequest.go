@@ -6,8 +6,8 @@ type PullRequest struct {
 	AuthorID          string   `json:"author_id"`
 	Status            string   `json:"status"` // OPEN, MERGED
 	AssignedReviewers []string `json:"assigned_reviewers"`
-	CreatedAt         *string  `json:"createdAt,omitempty"`
-	MergedAt          *string  `json:"mergedAt,omitempty"`
+	CreatedAt         string   `json:"createdAt,omitempty"`
+	MergedAt          string   `json:"mergedAt,omitempty"`
 }
 
 type PullRequestShort struct {
@@ -15,4 +15,16 @@ type PullRequestShort struct {
 	PullRequestName string `json:"pull_request_name"`
 	AuthorID        string `json:"author_id"`
 	Status          string `json:"status"` // OPEN, MERGED
+}
+
+func Create(bindedPR PullRequestShort) (PullRequest, error) {
+	return PullRequest{}, nil
+}
+
+func Merge(bindedPR PullRequestShort) (PullRequest, error) {
+	return PullRequest{}, nil
+}
+
+func Reassign(bindedPR PullRequestShort) (PullRequest, error) {
+	return PullRequest{}, nil
 }
