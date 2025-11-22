@@ -1,9 +1,5 @@
 package users
 
-import (
-	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/errs"
-)
-
 var UserCache map[string]User = make(map[string]User)
 
 type User struct {
@@ -19,15 +15,5 @@ type UserActivity struct {
 }
 
 type UserResponse struct {
-	user User `json:"user"`
-}
-
-func SetActive(bindUser UserActivity) (UserResponse, error) {
-	user, ok := UserCache[bindUser.UserID]
-	if !ok {
-		return UserResponse{}, errs.ErrNotFound
-	}
-	user.IsActive = bindUser.IsActive
-	UserCache[bindUser.UserID] = user
-	return UserResponse{user: user}, nil
+	User User `json:"user"`
 }

@@ -9,7 +9,7 @@ import (
 )
 
 var PRcache map[string]PullRequest = make(map[string]PullRequest)
-var UserPRcache map[string][]PullRequest = make(map[string][]PullRequest)
+var UserPRcache map[string][]PullRequestShort = make(map[string][]PullRequestShort)
 
 type PullRequest struct {
 	PullRequestID     string   `json:"pull_request_id"`
@@ -59,7 +59,7 @@ func Create(bindedPR PullRequestShort) (PRResponse, error) {
 		if j.IsActive {
 			counter++
 			req.AssignedReviewers = append(req.AssignedReviewers, j.UserID)
-			UserPRcache[j.UserID] = append(UserPRcache[j.UserID], req)
+			UserPRcache[j.UserID] = append(UserPRcache[j.UserID], PrToPrShort(req))
 		}
 		if counter == 2 {
 			break
@@ -79,43 +79,43 @@ func Merge(bindedPR PullRequestShort) (PRResponse, error) {
 	}
 	req.Status = "MERGED"
 	req.MergedAt = time.Now().UTC().Format(time.RFC3339)
+	PRcache[bindedPR.PullRequestID] = req
 	return PRResponse{PullRequest: req}, nil
 }
 
-func Reassign(bindedPR PullRequestShort) (PRResponse, error) {
+func Reassign(bindedPR PRReassign) (PRReassignResponse, error) {
 	req, ok := PRcache[bindedPR.PullRequestID]
 	if !ok {
-		return PRResponse{}, errs.ErrNotFound
+		return PRReassignResponse{}, errs.ErrNotFound
 	}
-	reviewer, ok := users.UserCache[bindedPR.AuthorID]
+
+	reviewer, ok := users.UserCache[bindedPR.OldReviewerID]
 	if !ok {
-		return PRResponse{}, errs.ErrNotFound
+		return PRReassignResponse{}, errs.ErrNotFound
 	}
+
 	if req.Status == "MERGED" {
-		return PRResponse{}, errs.ErrPRMerged
+		return PRReassignResponse{}, errs.ErrPRMerged
 	}
-	author := req.AuthorID
-	if len(req.AssignedReviewers) == 0 {
-		return PRResponse{}, errs.ErrNotAssigned
-	}
-	index := 0
-	rew0 := req.AssignedReviewers[0]
-	if len(req.AssignedReviewers) == 1 && rew0 != reviewer.UserID {
-		return PRResponse{}, errs.ErrNotAssigned
-	}
-	if rew0 != reviewer.UserID {
-		index++
-	}
-	rew1 := ""
-	if len(req.AssignedReviewers) == 2 {
-		rew1 = req.AssignedReviewers[1]
-		if rew1 != reviewer.UserID {
-			return PRResponse{}, errs.ErrNotAssigned
+
+	stopUserMap := make(map[string]int, 3)
+	stopUserMap[req.AuthorID]++
+	index := -1
+	for i, j := range req.AssignedReviewers {
+		stopUserMap[j]++
+		if j == bindedPR.OldReviewerID {
+			index = i
 		}
 	}
+
+	if index == -1 {
+		return PRReassignResponse{}, errs.ErrNotAssigned
+	}
+
 	reqTeam := team.TeamCache[reviewer.TeamName]
+
 	for _, j := range reqTeam.Members {
-		if j.UserID == author || j.UserID == rew0 || j.UserID == rew1 {
+		if _, ok := stopUserMap[j.UserID]; ok {
 			continue
 		}
 		if j.IsActive {
@@ -127,18 +127,38 @@ func Reassign(bindedPR PullRequestShort) (PRResponse, error) {
 					break
 				}
 			}
-			UserPRcache[j.UserID] = append(UserPRcache[j.UserID], req)
-			return PRResponse{PullRequest: req}, nil
+			UserPRcache[j.UserID] = append(UserPRcache[j.UserID], PrToPrShort(req))
+			return PRReassignResponse{PullRequest: req, ReplacedBy: reviewer.UserID}, nil
 		}
 	}
-	return PRResponse{}, errs.ErrNoCandidate
+
+	return PRReassignResponse{}, errs.ErrNoCandidate
 }
 
 func GetPR(UserID string) UserRequests {
-	return UserRequests{UserID: UserID, Pull_requests: UserPRcache[UserID]}
+	return UserRequests{UserID: UserID, PullRequests: UserPRcache[UserID]}
+}
+
+func PrToPrShort(PR PullRequest) PullRequestShort {
+	return PullRequestShort{
+		PullRequestID:   PR.PullRequestID,
+		PullRequestName: PR.PullRequestName,
+		AuthorID:        PR.AuthorID,
+		Status:          PR.Status,
+	}
 }
 
 type UserRequests struct {
-	UserID        string        `json:"user_id"`
-	Pull_requests []PullRequest `json:"pull_requests"`
+	UserID       string             `json:"user_id"`
+	PullRequests []PullRequestShort `json:"pull_requests"`
+}
+
+type PRReassign struct {
+	PullRequestID string `json:"pull_request_id"`
+	OldReviewerID string `json:"old_reviewer_id"`
+}
+
+type PRReassignResponse struct {
+	PullRequest PullRequest `json:"pr"`
+	ReplacedBy  string      `json:"replaced_by"`
 }

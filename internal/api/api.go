@@ -7,7 +7,6 @@ import (
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/errs"
 	pullrequest "github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/pullRequest"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/team"
-	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/users"
 	"github.com/labstack/echo/v4"
 )
 
@@ -16,7 +15,7 @@ func AddTeam(c echo.Context) error {
 	var TeamResponse team.TeamResponse
 	err := c.Bind(&bindedTeam)
 	if err != nil { //ошибка валидации не предусмотрена - надо подумать
-		return c.JSON(http.StatusBadRequest, errs.TeamExists())
+		return c.JSON(http.StatusBadRequest, errs.NotFound())
 	}
 	TeamResponse, err = team.Add(bindedTeam)
 	if err != nil {
@@ -35,12 +34,12 @@ func GetTeam(c echo.Context) error {
 }
 
 func SetUserIsActive(c echo.Context) error {
-	var bindedUser users.UserActivity
+	var bindedUser team.UserActivity
 	err := c.Bind(&bindedUser)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, errs.NotFound())
 	}
-	user, err := users.SetActive(bindedUser)
+	user, err := team.SetActive(bindedUser)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, errs.NotFound())
 	}
@@ -83,7 +82,7 @@ func MergePullRequest(c echo.Context) error {
 }
 
 func ReassignPullRequest(c echo.Context) error {
-	var bindedPR pullrequest.PullRequestShort
+	var bindedPR pullrequest.PRReassign
 	err := c.Bind(&bindedPR)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, errs.NotFound())

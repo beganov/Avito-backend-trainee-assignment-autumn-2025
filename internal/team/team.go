@@ -44,3 +44,30 @@ func Add(bindedTeam Team) (TeamResponse, error) {
 	}
 	return TeamResponse{bindedTeam}, nil
 }
+
+func SetActive(bindUser UserActivity) (UserResponse, error) {
+	user, ok := users.UserCache[bindUser.UserID]
+	if !ok {
+		return UserResponse{}, errs.ErrNotFound
+	}
+	user.IsActive = bindUser.IsActive
+	users.UserCache[bindUser.UserID] = user
+	team := TeamCache[user.TeamName]
+	for i, j := range team.Members {
+		if j.UserID == bindUser.UserID {
+			team.Members[i].IsActive = user.IsActive
+			break
+		}
+	}
+	TeamCache[user.TeamName] = team
+	return UserResponse{User: user}, nil
+}
+
+type UserActivity struct {
+	UserID   string `json:"user_id"`
+	IsActive bool   `json:"is_active"`
+}
+
+type UserResponse struct {
+	User users.User `json:"user"`
+}

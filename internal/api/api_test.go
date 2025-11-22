@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	pullrequest "github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/pullRequest"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/team"
@@ -40,11 +41,11 @@ func TestAddTeam(t *testing.T) {
 			},
 			expectedStatus: http.StatusCreated,
 			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
-				var response team.Team
+				var response team.TeamResponse
 				err := json.Unmarshal(rec.Body.Bytes(), &response)
 				assert.NoError(t, err)
-				assert.Equal(t, "backend", response.TeamName)
-				assert.Len(t, response.Members, 2)
+				assert.Equal(t, "backend", response.Team.TeamName)
+				assert.Len(t, response.Team.Members, 2)
 			},
 		},
 		{
@@ -87,7 +88,6 @@ func TestGetTeam(t *testing.T) {
 	e := echo.New()
 	resetTestData()
 
-	// Сначала создаем команду для теста
 	team.Add(team.Team{
 		TeamName: "frontend",
 		Members: []team.TeamMember{
@@ -135,23 +135,49 @@ func TestSetUserIsActive(t *testing.T) {
 	e := echo.New()
 	resetTestData()
 
+	// Создаем тестового пользователя
+	users.UserCache["u1"] = users.User{
+		UserID:   "u1",
+		Username: "Alice",
+		TeamName: "backend",
+		IsActive: false,
+	}
+
 	tests := []struct {
 		name           string
 		requestBody    interface{}
 		expectedStatus int
+		checkResponse  func(*testing.T, *httptest.ResponseRecorder)
 	}{
 		{
 			name: "Success - set user active",
-			requestBody: users.UserActivity{
+			requestBody: team.UserActivity{
 				UserID:   "u1",
 				IsActive: true,
 			},
 			expectedStatus: http.StatusOK,
+			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				var response team.UserResponse
+				err := json.Unmarshal(rec.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.Equal(t, "u1", response.User.UserID)
+				assert.True(t, response.User.IsActive)
+			},
 		},
 		{
-			name:           "Error - invalid user data",
-			requestBody:    "invalid",
+			name: "Error - user not found",
+			requestBody: team.UserActivity{
+				UserID:   "non_existent",
+				IsActive: true,
+			},
 			expectedStatus: http.StatusNotFound,
+			checkResponse:  func(t *testing.T, rec *httptest.ResponseRecorder) {},
+		},
+		{
+			name:           "Error - invalid JSON",
+			requestBody:    "invalid json",
+			expectedStatus: http.StatusNotFound,
+			checkResponse:  func(t *testing.T, rec *httptest.ResponseRecorder) {},
 		},
 	}
 
@@ -164,9 +190,12 @@ func TestSetUserIsActive(t *testing.T) {
 			c := e.NewContext(req, rec)
 
 			err := SetUserIsActive(c)
-
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedStatus, rec.Code)
+
+			if tt.checkResponse != nil {
+				tt.checkResponse(t, rec)
+			}
 		})
 	}
 }
@@ -175,25 +204,61 @@ func TestCreatePullRequest(t *testing.T) {
 	e := echo.New()
 	resetTestData()
 
+	team.TeamCache["backend"] = team.Team{
+		TeamName: "backend",
+		Members: []team.TeamMember{
+			{UserID: "author1", Username: "Author", IsActive: true},
+			{UserID: "reviewer1", Username: "Reviewer1", IsActive: true},
+			{UserID: "reviewer2", Username: "Reviewer2", IsActive: true},
+		},
+	}
+	users.UserCache["author1"] = users.User{
+		UserID: "author1", Username: "Author", TeamName: "backend", IsActive: true,
+	}
+
 	tests := []struct {
 		name           string
 		requestBody    interface{}
 		expectedStatus int
+		checkResponse  func(*testing.T, *httptest.ResponseRecorder)
 	}{
 		{
 			name: "Success - create PR",
 			requestBody: pullrequest.PullRequestShort{
 				PullRequestID:   "pr1",
-				PullRequestName: "Fix bug",
-				AuthorID:        "u1",
-				Status:          "open",
+				PullRequestName: "Test PR",
+				AuthorID:        "author1",
+				Status:          "OPEN",
 			},
 			expectedStatus: http.StatusCreated,
+			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				var response pullrequest.PRResponse
+				err := json.Unmarshal(rec.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.Equal(t, "pr1", response.PullRequest.PullRequestID)
+				assert.Equal(t, "OPEN", response.PullRequest.Status)
+				assert.Len(t, response.PullRequest.AssignedReviewers, 2)
+			},
 		},
 		{
-			name:           "Error - invalid PR data",
-			requestBody:    "invalid",
+			name: "Error - PR already exists",
+			requestBody: pullrequest.PullRequestShort{
+				PullRequestID:   "pr1",
+				PullRequestName: "Test PR",
+				AuthorID:        "author1",
+			},
+			expectedStatus: http.StatusConflict,
+			checkResponse:  func(t *testing.T, rec *httptest.ResponseRecorder) {},
+		},
+		{
+			name: "Error - author not found",
+			requestBody: pullrequest.PullRequestShort{
+				PullRequestID:   "pr2",
+				PullRequestName: "Test PR",
+				AuthorID:        "unknown_author",
+			},
 			expectedStatus: http.StatusNotFound,
+			checkResponse:  func(t *testing.T, rec *httptest.ResponseRecorder) {},
 		},
 	}
 
@@ -206,9 +271,73 @@ func TestCreatePullRequest(t *testing.T) {
 			c := e.NewContext(req, rec)
 
 			err := CreatePullRequest(c)
-
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedStatus, rec.Code)
+
+			if tt.checkResponse != nil {
+				tt.checkResponse(t, rec)
+			}
+		})
+	}
+}
+
+func TestMergePullRequest(t *testing.T) {
+	e := echo.New()
+	resetTestData()
+
+	pullrequest.PRcache["pr1"] = pullrequest.PullRequest{
+		PullRequestID:   "pr1",
+		PullRequestName: "Test PR",
+		AuthorID:        "author1",
+		Status:          "OPEN",
+		CreatedAt:       time.Now().UTC().Format(time.RFC3339),
+	}
+
+	tests := []struct {
+		name           string
+		requestBody    interface{}
+		expectedStatus int
+		checkResponse  func(*testing.T, *httptest.ResponseRecorder)
+	}{
+		{
+			name: "Success - merge PR",
+			requestBody: pullrequest.PullRequestShort{
+				PullRequestID: "pr1",
+			},
+			expectedStatus: http.StatusCreated,
+			checkResponse: func(t *testing.T, rec *httptest.ResponseRecorder) {
+				var response pullrequest.PRResponse
+				err := json.Unmarshal(rec.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.Equal(t, "MERGED", response.PullRequest.Status)
+				assert.NotEmpty(t, response.PullRequest.MergedAt)
+			},
+		},
+		{
+			name: "Error - PR not found",
+			requestBody: pullrequest.PullRequestShort{
+				PullRequestID: "unknown_pr",
+			},
+			expectedStatus: http.StatusNotFound,
+			checkResponse:  func(t *testing.T, rec *httptest.ResponseRecorder) {},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body, _ := json.Marshal(tt.requestBody)
+			req := httptest.NewRequest(http.MethodPost, "/pr/merge", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+
+			err := MergePullRequest(c)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedStatus, rec.Code)
+
+			if tt.checkResponse != nil {
+				tt.checkResponse(t, rec)
+			}
 		})
 	}
 }
