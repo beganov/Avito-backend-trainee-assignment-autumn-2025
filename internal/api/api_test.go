@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/cache"
 	pullrequest "github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/pullRequest"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/team"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/users"
@@ -136,12 +137,12 @@ func TestSetUserIsActive(t *testing.T) {
 	resetTestData()
 
 	// Создаем тестового пользователя
-	users.UserCache["u1"] = users.User{
+	cache.UserCache.Set("u1", users.User{
 		UserID:   "u1",
 		Username: "Alice",
 		TeamName: "backend",
 		IsActive: false,
-	}
+	})
 
 	tests := []struct {
 		name           string
@@ -204,17 +205,17 @@ func TestCreatePullRequest(t *testing.T) {
 	e := echo.New()
 	resetTestData()
 
-	team.TeamCache["backend"] = team.Team{
+	cache.TeamCache.Set("backend", team.Team{
 		TeamName: "backend",
 		Members: []team.TeamMember{
 			{UserID: "author1", Username: "Author", IsActive: true},
 			{UserID: "reviewer1", Username: "Reviewer1", IsActive: true},
 			{UserID: "reviewer2", Username: "Reviewer2", IsActive: true},
 		},
-	}
-	users.UserCache["author1"] = users.User{
+	})
+	cache.UserCache.Set("author1", users.User{
 		UserID: "author1", Username: "Author", TeamName: "backend", IsActive: true,
-	}
+	})
 
 	tests := []struct {
 		name           string
@@ -285,13 +286,13 @@ func TestMergePullRequest(t *testing.T) {
 	e := echo.New()
 	resetTestData()
 
-	pullrequest.PRcache["pr1"] = pullrequest.PullRequest{
+	cache.PRcache.Set("pr1", pullrequest.PullRequest{
 		PullRequestID:   "pr1",
 		PullRequestName: "Test PR",
 		AuthorID:        "author1",
 		Status:          "OPEN",
 		CreatedAt:       time.Now().UTC().Format(time.RFC3339),
-	}
+	})
 
 	tests := []struct {
 		name           string

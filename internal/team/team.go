@@ -1,11 +1,10 @@
 package team
 
 import (
+	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/cache"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/errs"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/users"
 )
-
-var TeamCache map[string]Team = make(map[string]Team)
 
 type Team struct {
 	TeamName string       `json:"team_name"`
@@ -23,43 +22,47 @@ type TeamResponse struct {
 }
 
 func Get(TeamName string) (Team, error) {
-	if _, ok := TeamCache[TeamName]; !ok {
+	resTeam, ok := cache.TeamCache.Get(TeamName)
+	if !ok {
 		return Team{}, errs.ErrNotFound
 	}
-	return TeamCache[TeamName], nil
+	return resTeam.(Team), nil
 }
 
 func Add(bindedTeam Team) (TeamResponse, error) {
-	if _, ok := TeamCache[bindedTeam.TeamName]; ok {
+	_, ok := cache.TeamCache.Get(bindedTeam.TeamName)
+	if ok {
 		return TeamResponse{}, errs.ErrTeamExists
 	}
-	TeamCache[bindedTeam.TeamName] = bindedTeam
+	cache.TeamCache.Set(bindedTeam.TeamName, bindedTeam)
 	for _, j := range bindedTeam.Members {
-		users.UserCache[j.UserID] = users.User{
+		cache.UserCache.Set(j.UserID, users.User{
 			UserID:   j.UserID,
 			Username: j.Username,
 			TeamName: bindedTeam.TeamName,
 			IsActive: j.IsActive,
-		}
+		})
 	}
 	return TeamResponse{bindedTeam}, nil
 }
 
 func SetActive(bindUser UserActivity) (UserResponse, error) {
-	user, ok := users.UserCache[bindUser.UserID]
+	iUser, ok := cache.UserCache.Get(bindUser.UserID)
 	if !ok {
 		return UserResponse{}, errs.ErrNotFound
 	}
+	user := iUser.(users.User)
 	user.IsActive = bindUser.IsActive
-	users.UserCache[bindUser.UserID] = user
-	team := TeamCache[user.TeamName]
+	cache.UserCache.Set(bindUser.UserID, user)
+	iTeam, _ := cache.TeamCache.Get(user.TeamName)
+	team := iTeam.(Team)
 	for i, j := range team.Members {
 		if j.UserID == bindUser.UserID {
 			team.Members[i].IsActive = user.IsActive
 			break
 		}
 	}
-	TeamCache[user.TeamName] = team
+	cache.TeamCache.Set(user.TeamName, team)
 	return UserResponse{User: user}, nil
 }
 

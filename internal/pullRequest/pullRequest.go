@@ -3,12 +3,12 @@ package pullrequest
 import (
 	"time"
 
+	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/cache"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/errs"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/team"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/users"
 )
 
-var PRcache map[string]PullRequest = make(map[string]PullRequest)
 var UserPRcache map[string][]PullRequestShort = make(map[string][]PullRequestShort)
 
 type PullRequest struct {
@@ -33,15 +33,16 @@ type PRResponse struct {
 }
 
 func Create(bindedPR PullRequestShort) (PRResponse, error) {
-	req, ok := PRcache[bindedPR.PullRequestID]
+	_, ok := cache.PRcache.Get(bindedPR.PullRequestID)
 	if ok {
 		return PRResponse{}, errs.ErrPRExists
 	}
-	author, ok := users.UserCache[bindedPR.AuthorID]
+	iUser, ok := cache.UserCache.Get(bindedPR.AuthorID)
 	if !ok {
 		return PRResponse{}, errs.ErrNotFound
 	}
-	req = PullRequest{
+	author := iUser.(users.User)
+	req := PullRequest{
 		PullRequestID:     bindedPR.PullRequestID,
 		PullRequestName:   bindedPR.PullRequestName,
 		AuthorID:          bindedPR.AuthorID,
@@ -49,8 +50,8 @@ func Create(bindedPR PullRequestShort) (PRResponse, error) {
 		AssignedReviewers: []string{},
 		CreatedAt:         time.Now().UTC().Format(time.RFC3339),
 	}
-
-	reqTeam := team.TeamCache[author.TeamName]
+	iteam, _ := cache.TeamCache.Get(author.TeamName)
+	reqTeam := iteam.(team.Team)
 	counter := 0
 	for _, j := range reqTeam.Members {
 		if j.UserID == author.UserID {
@@ -65,31 +66,42 @@ func Create(bindedPR PullRequestShort) (PRResponse, error) {
 			break
 		}
 	}
-	PRcache[bindedPR.PullRequestID] = req
+	cache.PRcache.Set(bindedPR.PullRequestID, req)
 	return PRResponse{PullRequest: req}, nil
 }
 
 func Merge(bindedPR PullRequestShort) (PRResponse, error) {
-	req, ok := PRcache[bindedPR.PullRequestID]
+	iPR, ok := cache.PRcache.Get(bindedPR.PullRequestID)
 	if !ok {
 		return PRResponse{}, errs.ErrNotFound
 	}
+	req := iPR.(PullRequest)
 	if req.Status == "MERGED" {
 		return PRResponse{PullRequest: req}, nil
 	}
 	req.Status = "MERGED"
 	req.MergedAt = time.Now().UTC().Format(time.RFC3339)
-	PRcache[bindedPR.PullRequestID] = req
+	cache.PRcache.Set(bindedPR.PullRequestID, req)
+
+	for _, k := range req.AssignedReviewers {
+		for i, j := range UserPRcache[k] {
+			if j.PullRequestID == req.PullRequestID {
+				UserPRcache[k][i].Status = "MERGED"
+				break
+			}
+		}
+	}
 	return PRResponse{PullRequest: req}, nil
 }
 
 func Reassign(bindedPR PRReassign) (PRReassignResponse, error) {
-	req, ok := PRcache[bindedPR.PullRequestID]
+	iPR, ok := cache.PRcache.Get(bindedPR.PullRequestID)
 	if !ok {
 		return PRReassignResponse{}, errs.ErrNotFound
 	}
-
-	reviewer, ok := users.UserCache[bindedPR.OldReviewerID]
+	req := iPR.(PullRequest)
+	iUser, ok := cache.UserCache.Get(bindedPR.OldReviewerID)
+	reviewer := iUser.(users.User)
 	if !ok {
 		return PRReassignResponse{}, errs.ErrNotFound
 	}
@@ -112,14 +124,15 @@ func Reassign(bindedPR PRReassign) (PRReassignResponse, error) {
 		return PRReassignResponse{}, errs.ErrNotAssigned
 	}
 
-	reqTeam := team.TeamCache[reviewer.TeamName]
+	iteam, _ := cache.TeamCache.Get(reviewer.TeamName)
+	reqTeam := iteam.(team.Team)
 
-	for _, j := range reqTeam.Members {
-		if _, ok := stopUserMap[j.UserID]; ok {
+	for _, k := range reqTeam.Members {
+		if _, ok := stopUserMap[k.UserID]; ok {
 			continue
 		}
-		if j.IsActive {
-			req.AssignedReviewers[index] = j.UserID
+		if k.IsActive {
+			req.AssignedReviewers[index] = k.UserID
 			for i, j := range UserPRcache[reviewer.UserID] {
 				if j.PullRequestID == req.PullRequestID {
 					UserPRcache[reviewer.UserID][i] = UserPRcache[reviewer.UserID][len(UserPRcache[reviewer.UserID])-1]
@@ -127,11 +140,10 @@ func Reassign(bindedPR PRReassign) (PRReassignResponse, error) {
 					break
 				}
 			}
-			UserPRcache[j.UserID] = append(UserPRcache[j.UserID], PrToPrShort(req))
+			UserPRcache[k.UserID] = append(UserPRcache[k.UserID], PrToPrShort(req))
 			return PRReassignResponse{PullRequest: req, ReplacedBy: reviewer.UserID}, nil
 		}
 	}
-
 	return PRReassignResponse{}, errs.ErrNoCandidate
 }
 
