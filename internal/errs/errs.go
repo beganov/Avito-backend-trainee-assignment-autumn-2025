@@ -1,5 +1,7 @@
 package errs
 
+import "errors"
+
 type ErrorCode string
 
 const (
@@ -9,6 +11,15 @@ const (
 	CodeNotAssigned ErrorCode = "NOT_ASSIGNED"
 	CodeNoCandidate ErrorCode = "NO_CANDIDATE"
 	CodeNotFound    ErrorCode = "NOT_FOUND"
+)
+
+var (
+	ErrTeamExists  = errors.New("team already exists")
+	ErrPRExists    = errors.New("PR id already exists")
+	ErrPRMerged    = errors.New("PR_MERGED")
+	ErrNotAssigned = errors.New("reviewer is not assigned to this PR")
+	ErrNoCandidate = errors.New("no active replacement candidate in team")
+	ErrNotFound    = errors.New("resource not found")
 )
 
 type ErrorResponse struct {
@@ -26,25 +37,25 @@ func NewErrorResponse(code ErrorCode, message string) ErrorResponse {
 }
 
 func TeamExists() ErrorResponse {
-	return NewErrorResponse(CodeTeamExists, "team already exists")
-}
-
-func NotFound() ErrorResponse {
-	return NewErrorResponse(CodeNotFound, "resource not found")
+	return NewErrorResponse(CodeTeamExists, ErrTeamExists.Error())
 }
 
 func PRExists() ErrorResponse {
-	return NewErrorResponse(CodePRExists, "PR id already exists")
+	return NewErrorResponse(CodePRExists, ErrPRExists.Error())
 }
 
 func PRMerged() ErrorResponse {
-	return NewErrorResponse(CodePRMerged, "cannot reassign on merged PR")
+	return NewErrorResponse(CodePRMerged, ErrPRMerged.Error())
 }
 
 func NotAssigned() ErrorResponse {
-	return NewErrorResponse(CodeNotAssigned, "reviewer is not assigned to this PR")
+	return NewErrorResponse(CodeNotAssigned, ErrNotAssigned.Error())
 }
 
 func NoCandidate() ErrorResponse {
-	return NewErrorResponse(CodeNoCandidate, "no active replacement candidate in team")
+	return NewErrorResponse(CodeNoCandidate, ErrNoCandidate.Error())
+}
+
+func NotFound() ErrorResponse {
+	return NewErrorResponse(CodeNotFound, ErrNotFound.Error())
 }

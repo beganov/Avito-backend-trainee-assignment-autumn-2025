@@ -1,9 +1,7 @@
 package users
 
 import (
-	"errors"
-
-	pullrequest "github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/pullRequest"
+	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/errs"
 )
 
 var UserCache map[string]User = make(map[string]User)
@@ -20,22 +18,16 @@ type UserActivity struct {
 	IsActive bool   `json:"is_active"`
 }
 
-type UserRequests struct {
-	UserID        string                         `json:"user_id"`
-	Pull_requests []pullrequest.PullRequestShort `json:"pull_requests"`
+type UserResponse struct {
+	user User `json:"user"`
 }
 
-func GetPR(UserID string) UserRequests {
-
-	return UserRequests{}
-}
-
-func SetActive(bindUser UserActivity) (User, error) {
-	if _, ok := UserCache[bindUser.UserID]; !ok {
-		return User{}, errors.New("resource not found")
+func SetActive(bindUser UserActivity) (UserResponse, error) {
+	user, ok := UserCache[bindUser.UserID]
+	if !ok {
+		return UserResponse{}, errs.ErrNotFound
 	}
-	user := UserCache[bindUser.UserID]
 	user.IsActive = bindUser.IsActive
 	UserCache[bindUser.UserID] = user
-	return user, nil
+	return UserResponse{user: user}, nil
 }

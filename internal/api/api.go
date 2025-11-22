@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/errs"
@@ -10,18 +11,18 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// Handler
 func AddTeam(c echo.Context) error {
 	var bindedTeam team.Team
+	var TeamResponse team.TeamResponse
 	err := c.Bind(&bindedTeam)
 	if err != nil { //ошибка валидации не предусмотрена - надо подумать
 		return c.JSON(http.StatusBadRequest, errs.TeamExists())
 	}
-	bindedTeam, err = team.Add(bindedTeam)
+	TeamResponse, err = team.Add(bindedTeam)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, errs.TeamExists())
 	}
-	return c.JSON(http.StatusCreated, bindedTeam)
+	return c.JSON(http.StatusCreated, TeamResponse)
 }
 
 func GetTeam(c echo.Context) error {
@@ -48,7 +49,7 @@ func SetUserIsActive(c echo.Context) error {
 
 func GetUserReview(c echo.Context) error {
 	user_id := c.QueryParam("user_id")
-	requests := users.GetPR(user_id)
+	requests := pullrequest.GetPR(user_id)
 	return c.JSON(http.StatusOK, requests)
 }
 
@@ -60,6 +61,9 @@ func CreatePullRequest(c echo.Context) error {
 	}
 	request, err := pullrequest.Create(bindedPR)
 	if err != nil {
+		if errors.Is(err, errs.ErrPRExists) {
+			return c.JSON(http.StatusConflict, errs.PRExists())
+		}
 		return c.JSON(http.StatusNotFound, errs.NotFound())
 	}
 	return c.JSON(http.StatusCreated, request)
@@ -86,6 +90,15 @@ func ReassignPullRequest(c echo.Context) error {
 	}
 	request, err := pullrequest.Reassign(bindedPR)
 	if err != nil {
+		if errors.Is(err, errs.ErrPRMerged) {
+			return c.JSON(http.StatusConflict, errs.PRMerged())
+		}
+		if errors.Is(err, errs.ErrNotAssigned) {
+			return c.JSON(http.StatusConflict, errs.NotAssigned())
+		}
+		if errors.Is(err, errs.ErrNoCandidate) {
+			return c.JSON(http.StatusConflict, errs.NoCandidate())
+		}
 		return c.JSON(http.StatusNotFound, errs.NotFound())
 	}
 	return c.JSON(http.StatusCreated, request)

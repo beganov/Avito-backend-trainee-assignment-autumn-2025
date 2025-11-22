@@ -1,8 +1,7 @@
 package team
 
 import (
-	"errors"
-
+	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/errs"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/users"
 )
 
@@ -19,16 +18,20 @@ type TeamMember struct {
 	IsActive bool   `json:"is_active"`
 }
 
+type TeamResponse struct {
+	Team Team `json:"team"`
+}
+
 func Get(TeamName string) (Team, error) {
 	if _, ok := TeamCache[TeamName]; !ok {
-		return Team{}, errors.New("resource not found")
+		return Team{}, errs.ErrNotFound
 	}
 	return TeamCache[TeamName], nil
 }
 
-func Add(bindedTeam Team) (Team, error) {
+func Add(bindedTeam Team) (TeamResponse, error) {
 	if _, ok := TeamCache[bindedTeam.TeamName]; ok {
-		return Team{}, errors.New("team already exists")
+		return TeamResponse{}, errs.ErrTeamExists
 	}
 	TeamCache[bindedTeam.TeamName] = bindedTeam
 	for _, j := range bindedTeam.Members {
@@ -39,5 +42,5 @@ func Add(bindedTeam Team) (Team, error) {
 			IsActive: j.IsActive,
 		}
 	}
-	return bindedTeam, nil
+	return TeamResponse{bindedTeam}, nil
 }
