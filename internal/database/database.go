@@ -241,3 +241,40 @@ func SetPRToDB(ctx context.Context, pr models.PullRequest) error {
 
 	return nil
 }
+
+func GetPRFromDBByUser(ctx context.Context, userID string) (models.UserRequests, error) {
+	if DB == nil {
+		return models.UserRequests{}, fmt.Errorf("database not initialized")
+	}
+
+	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut)
+	defer cancel()
+
+	var userRequests models.UserRequests
+	userRequests.UserID = userID
+
+	rows, err := DB.Query(dbCtx, `
+        SELECT pr.pull_request_id, pr.pull_request_name, pr.author_id, pr.status
+        FROM pull_requests pr
+        WHERE pr.assigned_reviewers @> $1`,
+		fmt.Sprintf(`["%s"]`, userID))
+
+	if err != nil {
+		return models.UserRequests{}, fmt.Errorf("failed to get user PRs: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var pr models.PullRequestShort
+
+		err := rows.Scan(
+			&pr.PullRequestID, &pr.PullRequestName, &pr.AuthorID, &pr.Status)
+
+		if err != nil {
+			return models.UserRequests{}, fmt.Errorf("failed to scan PR: %w", err)
+		}
+		userRequests.PullRequests = append(userRequests.PullRequests, pr)
+	}
+
+	return userRequests, nil
+}

@@ -9,7 +9,6 @@ import (
 var UserCache lruCache
 var TeamCache lruCache
 var PRcache lruCache
-var UserPRcache lruCache
 
 // node in LRU list
 type lruNode struct {
@@ -103,5 +102,4 @@ func InitCache() {
 	UserCache = NewOrderCache(config.CacheCap)
 	TeamCache = NewOrderCache(config.CacheCap)
 	PRcache = NewOrderCache(config.CacheCap)
-	UserPRcache = NewOrderCache(config.CacheCap)
 }

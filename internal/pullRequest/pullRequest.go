@@ -10,7 +10,7 @@ import (
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/models"
 )
 
-var UserPRcache map[string][]models.PullRequestShort = make(map[string][]models.PullRequestShort)
+//var UserPRcache map[string][]models.PullRequestShort = make(map[string][]models.PullRequestShort)
 
 func Create(ctx context.Context, bindedPR models.PullRequestShort) (models.PRResponse, error) {
 	_, ok := cache.PRcache.Get(bindedPR.PullRequestID)
@@ -59,7 +59,6 @@ func Create(ctx context.Context, bindedPR models.PullRequestShort) (models.PRRes
 		if j.IsActive {
 			counter++
 			req.AssignedReviewers = append(req.AssignedReviewers, j.UserID)
-			UserPRcache[j.UserID] = append(UserPRcache[j.UserID], PrToPrShort(req))
 		}
 		if counter == 2 {
 			break
@@ -95,15 +94,6 @@ func Merge(ctx context.Context, bindedPR models.PullRequestShort) (models.PRResp
 	err = database.SetPRToDB(ctx, req)
 	if err != nil {
 		return models.PRResponse{}, errs.ErrPRExists //вернуть 500
-	}
-
-	for _, k := range req.AssignedReviewers {
-		for i, j := range UserPRcache[k] {
-			if j.PullRequestID == req.PullRequestID {
-				UserPRcache[k][i].Status = "MERGED"
-				break
-			}
-		}
 	}
 	return models.PRResponse{PullRequest: req}, nil
 }
@@ -166,14 +156,6 @@ func Reassign(ctx context.Context, bindedPR models.PRReassign) (models.PRReassig
 		}
 		if k.IsActive {
 			req.AssignedReviewers[index] = k.UserID
-			for i, j := range UserPRcache[reviewer.UserID] {
-				if j.PullRequestID == req.PullRequestID {
-					UserPRcache[reviewer.UserID][i] = UserPRcache[reviewer.UserID][len(UserPRcache[reviewer.UserID])-1]
-					UserPRcache[reviewer.UserID] = UserPRcache[reviewer.UserID][:len(UserPRcache[reviewer.UserID])-1]
-					break
-				}
-			}
-			UserPRcache[k.UserID] = append(UserPRcache[k.UserID], PrToPrShort(req))
 			cache.PRcache.Set(bindedPR.PullRequestID, req)
 			err = database.SetPRToDB(ctx, req)
 			if err != nil {
@@ -186,7 +168,11 @@ func Reassign(ctx context.Context, bindedPR models.PRReassign) (models.PRReassig
 }
 
 func GetPR(ctx context.Context, UserID string) models.UserRequests {
-	return models.UserRequests{UserID: UserID, PullRequests: UserPRcache[UserID]}
+	res, err := database.GetPRFromDBByUser(ctx, UserID)
+	if err != nil {
+		return models.UserRequests{UserID: UserID, PullRequests: []models.PullRequestShort{}} //вернуть 500
+	}
+	return res
 }
 
 func PrToPrShort(PR models.PullRequest) models.PullRequestShort {
