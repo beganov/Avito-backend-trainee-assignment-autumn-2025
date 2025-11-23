@@ -97,11 +97,11 @@ info:
     email: support@swagger.io
     name: API Support
     url: http://www.swagger.io/support
-  description: API для управления командами и пул-реквестами
+  description: Сервис назначения ревьюеров для Pull Request’ов
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
-  title: Avito Backend Trainee Assignment API
+  title: PR Reviewer Assignment Service (Test Task, Fall 2025)
   version: "1.0"
 paths:
   /health:

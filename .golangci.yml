@@ -1,0 +1,47 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  disable-all: true
+  enable:
+    - gofmt
+    - govet
+    - staticcheck
+    - unused
+    - gosimple
+
+    - gci
+    
+    - goconst
+    - gocyclo
+
+    - errcheck
+    - ineffassign
+
+    - gosec
+
+linters-settings:
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(github.com/beganov/Avito-backend-trainee-assignment-autumn-2025)
+  goimports:
+    local-prefixes: github.com/beganov/Avito-backend-trainee-assignment-autumn-2025
+  gocyclo:
+    min-complexity: 15
+  gosec:
+    excludes:
+      - G114
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+    - path: internal/cache/cache_test.go
+      linters:
+        - gosec
