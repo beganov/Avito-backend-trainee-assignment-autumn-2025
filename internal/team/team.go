@@ -1,61 +1,85 @@
 package team
 
 import (
+	"context"
+
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/cache"
+	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/database"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/errs"
-	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/users"
+	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/models"
 )
 
-type Team struct {
-	TeamName string       `json:"team_name"`
-	Members  []TeamMember `json:"members"`
-}
-
-type TeamMember struct {
-	UserID   string `json:"user_id"`
-	Username string `json:"username"`
-	IsActive bool   `json:"is_active"`
-}
-
-type TeamResponse struct {
-	Team Team `json:"team"`
-}
-
-func Get(TeamName string) (Team, error) {
+func Get(TeamName string, ctx context.Context) (models.Team, error) {
 	resTeam, ok := cache.TeamCache.Get(TeamName)
 	if !ok {
-		return Team{}, errs.ErrNotFound
+		res, err, ok := database.GetTeamFromDB(ctx, TeamName)
+		if err != nil {
+			return models.Team{}, errs.ErrNotFound //вернуть 500
+		}
+		if !ok {
+			return models.Team{}, errs.ErrNotFound
+		} else {
+			cache.TeamCache.Set(TeamName, res)
+			return res, nil
+		}
 	}
-	return resTeam.(Team), nil
+	return resTeam.(models.Team), nil
 }
 
-func Add(bindedTeam Team) (TeamResponse, error) {
+func Add(bindedTeam models.Team, ctx context.Context) (models.TeamResponse, error) {
 	_, ok := cache.TeamCache.Get(bindedTeam.TeamName)
 	if ok {
-		return TeamResponse{}, errs.ErrTeamExists
+		return models.TeamResponse{}, errs.ErrTeamExists
+	}
+	_, err, ok := database.GetTeamFromDB(ctx, bindedTeam.TeamName)
+	if err != nil {
+		return models.TeamResponse{}, errs.ErrTeamExists //вернуть 500
+	}
+	if ok {
+		return models.TeamResponse{}, errs.ErrTeamExists
 	}
 	cache.TeamCache.Set(bindedTeam.TeamName, bindedTeam)
+	err = database.SetTeamToDB(ctx, bindedTeam)
+	if err != nil {
+		return models.TeamResponse{}, errs.ErrNotAssigned //вернуть 500
+	}
 	for _, j := range bindedTeam.Members {
-		cache.UserCache.Set(j.UserID, users.User{
+		newUser := models.User{
 			UserID:   j.UserID,
 			Username: j.Username,
 			TeamName: bindedTeam.TeamName,
 			IsActive: j.IsActive,
-		})
+		}
+		cache.UserCache.Set(j.UserID, newUser)
 	}
-	return TeamResponse{bindedTeam}, nil
+	return models.TeamResponse{Team: bindedTeam}, nil
 }
 
-func SetActive(bindUser UserActivity) (UserResponse, error) {
+func SetActive(bindUser models.UserActivity, ctx context.Context) (models.UserResponse, error) {
+	var err error
 	iUser, ok := cache.UserCache.Get(bindUser.UserID)
 	if !ok {
-		return UserResponse{}, errs.ErrNotFound
+		iUser, err, ok = database.GetUserFromDB(ctx, bindUser.UserID)
+		if err != nil {
+			return models.UserResponse{}, err //вернуть 500
+		}
+		if !ok {
+			return models.UserResponse{}, errs.ErrNoCandidate
+		}
 	}
-	user := iUser.(users.User)
+
+	user := iUser.(models.User)
 	user.IsActive = bindUser.IsActive
 	cache.UserCache.Set(bindUser.UserID, user)
-	iTeam, _ := cache.TeamCache.Get(user.TeamName)
-	team := iTeam.(Team)
+
+	iTeam, ok := cache.TeamCache.Get(user.TeamName)
+	if !ok {
+		iTeam, err, ok = database.GetTeamFromDB(ctx, user.TeamName)
+		if err != nil || !ok {
+			return models.UserResponse{}, errs.ErrNoCandidate //вернуть 500
+		}
+	}
+	team := iTeam.(models.Team)
 	for i, j := range team.Members {
 		if j.UserID == bindUser.UserID {
 			team.Members[i].IsActive = user.IsActive
@@ -63,14 +87,9 @@ func SetActive(bindUser UserActivity) (UserResponse, error) {
 		}
 	}
 	cache.TeamCache.Set(user.TeamName, team)
-	return UserResponse{User: user}, nil
-}
-
-type UserActivity struct {
-	UserID   string `json:"user_id"`
-	IsActive bool   `json:"is_active"`
-}
-
-type UserResponse struct {
-	User users.User `json:"user"`
+	err = database.SetTeamToDB(ctx, team)
+	if err != nil {
+		return models.UserResponse{}, errs.ErrNotFound //вернуть 500
+	}
+	return models.UserResponse{User: user}, nil
 }

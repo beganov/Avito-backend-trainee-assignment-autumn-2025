@@ -36,8 +36,10 @@ func main() {
 
 	database.RunMigrations(config.PostgresURL)
 
-	db := database.InitDB(ctx, config.PostgresURL)
-	defer db.Close()
+	database.InitDB(ctx, config.PostgresURL)
+	defer database.DB.Close()
+
+	handler := api.NewHandler(ctx)
 
 	cache.InitCache()
 
@@ -49,15 +51,15 @@ func main() {
 	e.Use(middleware.Recover())
 
 	// Routes
-	e.POST("/team/add", api.AddTeam)
-	e.GET("/team/get", api.GetTeam)
+	e.POST("/team/add", handler.AddTeam)
+	e.GET("/team/get", handler.GetTeam)
 
-	e.POST("/users/setIsActive", api.SetUserIsActive)
-	e.GET("/users/getReview", api.GetUserReview)
+	e.POST("/users/setIsActive", handler.SetUserIsActive)
+	e.GET("/users/getReview", handler.GetUserReview)
 
-	e.POST("/pullRequest/create", api.CreatePullRequest)
-	e.POST("/pullRequest/merge", api.MergePullRequest)
-	e.POST("/pullRequest/reassign", api.ReassignPullRequest)
+	e.POST("/pullRequest/create", handler.CreatePullRequest)
+	e.POST("/pullRequest/merge", handler.MergePullRequest)
+	e.POST("/pullRequest/reassign", handler.ReassignPullRequest)
 
 	// Start server
 	go func() {
@@ -69,7 +71,7 @@ func main() {
 	<-ctx.Done()
 	log.Print("Shutting down services")
 
-	gracefulShutdown(e, db)
+	gracefulShutdown(e, database.DB)
 	log.Print("App stopped")
 }
 

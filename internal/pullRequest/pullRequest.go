@@ -1,48 +1,41 @@
 package pullrequest
 
 import (
+	"context"
 	"time"
 
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/cache"
+	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/database"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/errs"
-	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/team"
-	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/users"
+	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/models"
 )
 
-var UserPRcache map[string][]PullRequestShort = make(map[string][]PullRequestShort)
+var UserPRcache map[string][]models.PullRequestShort = make(map[string][]models.PullRequestShort)
 
-type PullRequest struct {
-	PullRequestID     string   `json:"pull_request_id"`
-	PullRequestName   string   `json:"pull_request_name"`
-	AuthorID          string   `json:"author_id"`
-	Status            string   `json:"status"` // OPEN, MERGED
-	AssignedReviewers []string `json:"assigned_reviewers"`
-	CreatedAt         string   `json:"createdAt,omitempty"`
-	MergedAt          string   `json:"mergedAt,omitempty"`
-}
-
-type PullRequestShort struct {
-	PullRequestID   string `json:"pull_request_id"`
-	PullRequestName string `json:"pull_request_name"`
-	AuthorID        string `json:"author_id"`
-	Status          string `json:"status"` // OPEN, MERGED
-}
-
-type PRResponse struct {
-	PullRequest PullRequest `json:"pr"`
-}
-
-func Create(bindedPR PullRequestShort) (PRResponse, error) {
+func Create(ctx context.Context, bindedPR models.PullRequestShort) (models.PRResponse, error) {
 	_, ok := cache.PRcache.Get(bindedPR.PullRequestID)
 	if ok {
-		return PRResponse{}, errs.ErrPRExists
+		return models.PRResponse{}, errs.ErrPRExists
+	}
+	_, err, ok := database.GetPRFromDB(ctx, bindedPR.PullRequestID)
+	if err != nil {
+		return models.PRResponse{}, errs.ErrNoCandidate //вернуть 500
+	}
+	if ok {
+		return models.PRResponse{}, errs.ErrPRExists
 	}
 	iUser, ok := cache.UserCache.Get(bindedPR.AuthorID)
 	if !ok {
-		return PRResponse{}, errs.ErrNotFound
+		iUser, err, ok = database.GetUserFromDB(ctx, bindedPR.AuthorID)
+		if err != nil {
+			return models.PRResponse{}, errs.ErrPRExists //вернуть 500
+		}
+		if !ok {
+			return models.PRResponse{}, errs.ErrNotFound
+		}
 	}
-	author := iUser.(users.User)
-	req := PullRequest{
+	author := iUser.(models.User)
+	req := models.PullRequest{
 		PullRequestID:     bindedPR.PullRequestID,
 		PullRequestName:   bindedPR.PullRequestName,
 		AuthorID:          bindedPR.AuthorID,
@@ -50,8 +43,14 @@ func Create(bindedPR PullRequestShort) (PRResponse, error) {
 		AssignedReviewers: []string{},
 		CreatedAt:         time.Now().UTC().Format(time.RFC3339),
 	}
-	iteam, _ := cache.TeamCache.Get(author.TeamName)
-	reqTeam := iteam.(team.Team)
+	iTeam, ok := cache.TeamCache.Get(author.TeamName)
+	if !ok {
+		iTeam, err, ok = database.GetTeamFromDB(ctx, author.TeamName)
+		if err != nil || !ok {
+			return models.PRResponse{}, errs.ErrPRExists //вернуть 500
+		}
+	}
+	reqTeam := iTeam.(models.Team)
 	counter := 0
 	for _, j := range reqTeam.Members {
 		if j.UserID == author.UserID {
@@ -67,21 +66,36 @@ func Create(bindedPR PullRequestShort) (PRResponse, error) {
 		}
 	}
 	cache.PRcache.Set(bindedPR.PullRequestID, req)
-	return PRResponse{PullRequest: req}, nil
+	err = database.SetPRToDB(ctx, req)
+	if err != nil {
+		return models.PRResponse{}, errs.ErrPRExists //вернуть 500
+	}
+	return models.PRResponse{PullRequest: req}, nil
 }
 
-func Merge(bindedPR PullRequestShort) (PRResponse, error) {
+func Merge(ctx context.Context, bindedPR models.PullRequestShort) (models.PRResponse, error) {
+	var err error
 	iPR, ok := cache.PRcache.Get(bindedPR.PullRequestID)
 	if !ok {
-		return PRResponse{}, errs.ErrNotFound
+		iPR, err, ok = database.GetPRFromDB(ctx, bindedPR.PullRequestID)
+		if err != nil {
+			return models.PRResponse{}, errs.ErrNoCandidate //вернуть 500
+		}
+		if !ok {
+			return models.PRResponse{}, errs.ErrNotFound
+		}
 	}
-	req := iPR.(PullRequest)
+	req := iPR.(models.PullRequest)
 	if req.Status == "MERGED" {
-		return PRResponse{PullRequest: req}, nil
+		return models.PRResponse{PullRequest: req}, nil
 	}
 	req.Status = "MERGED"
 	req.MergedAt = time.Now().UTC().Format(time.RFC3339)
 	cache.PRcache.Set(bindedPR.PullRequestID, req)
+	err = database.SetPRToDB(ctx, req)
+	if err != nil {
+		return models.PRResponse{}, errs.ErrPRExists //вернуть 500
+	}
 
 	for _, k := range req.AssignedReviewers {
 		for i, j := range UserPRcache[k] {
@@ -91,23 +105,36 @@ func Merge(bindedPR PullRequestShort) (PRResponse, error) {
 			}
 		}
 	}
-	return PRResponse{PullRequest: req}, nil
+	return models.PRResponse{PullRequest: req}, nil
 }
 
-func Reassign(bindedPR PRReassign) (PRReassignResponse, error) {
+func Reassign(ctx context.Context, bindedPR models.PRReassign) (models.PRReassignResponse, error) {
+	var err error
 	iPR, ok := cache.PRcache.Get(bindedPR.PullRequestID)
 	if !ok {
-		return PRReassignResponse{}, errs.ErrNotFound
+		iPR, err, ok = database.GetPRFromDB(ctx, bindedPR.PullRequestID)
+		if err != nil {
+			return models.PRReassignResponse{}, errs.ErrNoCandidate //вернуть 500
+		}
+		if !ok {
+			return models.PRReassignResponse{}, errs.ErrNotFound
+		}
 	}
-	req := iPR.(PullRequest)
+	req := iPR.(models.PullRequest)
 	iUser, ok := cache.UserCache.Get(bindedPR.OldReviewerID)
-	reviewer := iUser.(users.User)
 	if !ok {
-		return PRReassignResponse{}, errs.ErrNotFound
+		iUser, err, ok = database.GetUserFromDB(ctx, bindedPR.OldReviewerID)
+		if err != nil {
+			return models.PRReassignResponse{}, errs.ErrNoCandidate //вернуть 500
+		}
+		if !ok {
+			return models.PRReassignResponse{}, errs.ErrNotFound
+		}
 	}
+	reviewer := iUser.(models.User)
 
 	if req.Status == "MERGED" {
-		return PRReassignResponse{}, errs.ErrPRMerged
+		return models.PRReassignResponse{}, errs.ErrPRMerged
 	}
 
 	stopUserMap := make(map[string]int, 3)
@@ -121,11 +148,17 @@ func Reassign(bindedPR PRReassign) (PRReassignResponse, error) {
 	}
 
 	if index == -1 {
-		return PRReassignResponse{}, errs.ErrNotAssigned
+		return models.PRReassignResponse{}, errs.ErrNotAssigned
 	}
 
-	iteam, _ := cache.TeamCache.Get(reviewer.TeamName)
-	reqTeam := iteam.(team.Team)
+	iTeam, ok := cache.TeamCache.Get(reviewer.TeamName)
+	if !ok {
+		iTeam, err, ok = database.GetTeamFromDB(ctx, reviewer.TeamName)
+		if err != nil || !ok {
+			return models.PRReassignResponse{}, errs.ErrPRExists //вернуть 500
+		}
+	}
+	reqTeam := iTeam.(models.Team)
 
 	for _, k := range reqTeam.Members {
 		if _, ok := stopUserMap[k.UserID]; ok {
@@ -141,36 +174,26 @@ func Reassign(bindedPR PRReassign) (PRReassignResponse, error) {
 				}
 			}
 			UserPRcache[k.UserID] = append(UserPRcache[k.UserID], PrToPrShort(req))
-			return PRReassignResponse{PullRequest: req, ReplacedBy: reviewer.UserID}, nil
+			cache.PRcache.Set(bindedPR.PullRequestID, req)
+			err = database.SetPRToDB(ctx, req)
+			if err != nil {
+				return models.PRReassignResponse{}, errs.ErrPRExists //вернуть 500
+			}
+			return models.PRReassignResponse{PullRequest: req, ReplacedBy: reviewer.UserID}, nil
 		}
 	}
-	return PRReassignResponse{}, errs.ErrNoCandidate
+	return models.PRReassignResponse{}, errs.ErrNoCandidate
 }
 
-func GetPR(UserID string) UserRequests {
-	return UserRequests{UserID: UserID, PullRequests: UserPRcache[UserID]}
+func GetPR(ctx context.Context, UserID string) models.UserRequests {
+	return models.UserRequests{UserID: UserID, PullRequests: UserPRcache[UserID]}
 }
 
-func PrToPrShort(PR PullRequest) PullRequestShort {
-	return PullRequestShort{
+func PrToPrShort(PR models.PullRequest) models.PullRequestShort {
+	return models.PullRequestShort{
 		PullRequestID:   PR.PullRequestID,
 		PullRequestName: PR.PullRequestName,
 		AuthorID:        PR.AuthorID,
 		Status:          PR.Status,
 	}
-}
-
-type UserRequests struct {
-	UserID       string             `json:"user_id"`
-	PullRequests []PullRequestShort `json:"pull_requests"`
-}
-
-type PRReassign struct {
-	PullRequestID string `json:"pull_request_id"`
-	OldReviewerID string `json:"old_reviewer_id"`
-}
-
-type PRReassignResponse struct {
-	PullRequest PullRequest `json:"pr"`
-	ReplacedBy  string      `json:"replaced_by"`
 }
