@@ -3,16 +3,10 @@ package metrics
 import "github.com/prometheus/client_golang/prometheus"
 
 var (
-	HttpRequestsTotal = prometheus.NewCounter(
+	UsersCreatedTotal = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "http_requests_total",
-			Help: "Количество HTTP-запросов",
-		})
-
-	HttpErrorsTotal = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "http_errors_total",
-			Help: "Ошибки HTTP",
+			Name: "users_created_total",
+			Help: "Общее количество созданных пользователей",
 		})
 
 	HttpDuration = prometheus.NewHistogram(
@@ -25,6 +19,6 @@ var (
 
 func Init() {
 	prometheus.MustRegister(
-		HttpRequestsTotal, HttpErrorsTotal, HttpDuration,
+		UsersCreatedTotal, HttpDuration,
 	)
 }

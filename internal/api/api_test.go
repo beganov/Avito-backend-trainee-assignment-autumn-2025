@@ -149,7 +149,6 @@ func TestSetUserIsActive(t *testing.T) {
 	handler := NewHandler(ctx)
 	resetTestData()
 
-	// Создаем тестового пользователя
 	cache.UserCache.Set("u1", models.User{
 		UserID:   "u1",
 		Username: "Alice",

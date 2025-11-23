@@ -3,6 +3,8 @@ package team
 import (
 	"context"
 
+	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/metrics"
+
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/cache"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/database"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/errs"
@@ -14,7 +16,7 @@ func Get(TeamName string, ctx context.Context) (models.Team, error) {
 	if !ok {
 		res, err, ok := database.GetTeamFromDB(ctx, TeamName)
 		if err != nil {
-			return models.Team{}, errs.ErrNotFound //вернуть 500
+			return models.Team{}, errs.ErrDatabase
 		}
 		if !ok {
 			return models.Team{}, errs.ErrNotFound
@@ -33,7 +35,7 @@ func Add(bindedTeam models.Team, ctx context.Context) (models.TeamResponse, erro
 	}
 	_, err, ok := database.GetTeamFromDB(ctx, bindedTeam.TeamName)
 	if err != nil {
-		return models.TeamResponse{}, errs.ErrTeamExists //вернуть 500
+		return models.TeamResponse{}, errs.ErrDatabase
 	}
 	if ok {
 		return models.TeamResponse{}, errs.ErrTeamExists
@@ -41,9 +43,10 @@ func Add(bindedTeam models.Team, ctx context.Context) (models.TeamResponse, erro
 	cache.TeamCache.Set(bindedTeam.TeamName, bindedTeam)
 	err = database.SetTeamToDB(ctx, bindedTeam)
 	if err != nil {
-		return models.TeamResponse{}, errs.ErrNotAssigned //вернуть 500
+		return models.TeamResponse{}, errs.ErrDatabase
 	}
 	for _, j := range bindedTeam.Members {
+		metrics.UsersCreatedTotal.Inc()
 		newUser := models.User{
 			UserID:   j.UserID,
 			Username: j.Username,
@@ -61,7 +64,7 @@ func SetActive(bindUser models.UserActivity, ctx context.Context) (models.UserRe
 	if !ok {
 		iUser, err, ok = database.GetUserFromDB(ctx, bindUser.UserID)
 		if err != nil {
-			return models.UserResponse{}, err //вернуть 500
+			return models.UserResponse{}, errs.ErrDatabase
 		}
 		if !ok {
 			return models.UserResponse{}, errs.ErrNoCandidate
@@ -76,7 +79,7 @@ func SetActive(bindUser models.UserActivity, ctx context.Context) (models.UserRe
 	if !ok {
 		iTeam, err, ok = database.GetTeamFromDB(ctx, user.TeamName)
 		if err != nil || !ok {
-			return models.UserResponse{}, errs.ErrNoCandidate //вернуть 500
+			return models.UserResponse{}, errs.ErrDatabase
 		}
 	}
 	team := iTeam.(models.Team)
@@ -89,7 +92,7 @@ func SetActive(bindUser models.UserActivity, ctx context.Context) (models.UserRe
 	cache.TeamCache.Set(user.TeamName, team)
 	err = database.SetTeamToDB(ctx, team)
 	if err != nil {
-		return models.UserResponse{}, errs.ErrNotFound //вернуть 500
+		return models.UserResponse{}, errs.ErrDatabase
 	}
 	return models.UserResponse{User: user}, nil
 }

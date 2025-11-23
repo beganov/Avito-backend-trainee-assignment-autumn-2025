@@ -10,8 +10,6 @@ import (
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/models"
 )
 
-//var UserPRcache map[string][]models.PullRequestShort = make(map[string][]models.PullRequestShort)
-
 func Create(ctx context.Context, bindedPR models.PullRequestShort) (models.PRResponse, error) {
 	_, ok := cache.PRcache.Get(bindedPR.PullRequestID)
 	if ok {
@@ -19,7 +17,7 @@ func Create(ctx context.Context, bindedPR models.PullRequestShort) (models.PRRes
 	}
 	_, err, ok := database.GetPRFromDB(ctx, bindedPR.PullRequestID)
 	if err != nil {
-		return models.PRResponse{}, errs.ErrNoCandidate //вернуть 500
+		return models.PRResponse{}, errs.ErrDatabase
 	}
 	if ok {
 		return models.PRResponse{}, errs.ErrPRExists
@@ -28,11 +26,12 @@ func Create(ctx context.Context, bindedPR models.PullRequestShort) (models.PRRes
 	if !ok {
 		iUser, err, ok = database.GetUserFromDB(ctx, bindedPR.AuthorID)
 		if err != nil {
-			return models.PRResponse{}, errs.ErrPRExists //вернуть 500
+			return models.PRResponse{}, errs.ErrDatabase
 		}
 		if !ok {
 			return models.PRResponse{}, errs.ErrNotFound
 		}
+		cache.UserCache.Set(bindedPR.AuthorID, iUser.(models.User))
 	}
 	author := iUser.(models.User)
 	req := models.PullRequest{
@@ -47,8 +46,9 @@ func Create(ctx context.Context, bindedPR models.PullRequestShort) (models.PRRes
 	if !ok {
 		iTeam, err, ok = database.GetTeamFromDB(ctx, author.TeamName)
 		if err != nil || !ok {
-			return models.PRResponse{}, errs.ErrPRExists //вернуть 500
+			return models.PRResponse{}, errs.ErrDatabase
 		}
+		cache.TeamCache.Set(author.TeamName, iTeam.(models.Team))
 	}
 	reqTeam := iTeam.(models.Team)
 	counter := 0
@@ -67,7 +67,7 @@ func Create(ctx context.Context, bindedPR models.PullRequestShort) (models.PRRes
 	cache.PRcache.Set(bindedPR.PullRequestID, req)
 	err = database.SetPRToDB(ctx, req)
 	if err != nil {
-		return models.PRResponse{}, errs.ErrPRExists //вернуть 500
+		return models.PRResponse{}, errs.ErrDatabase
 	}
 	return models.PRResponse{PullRequest: req}, nil
 }
@@ -78,7 +78,7 @@ func Merge(ctx context.Context, bindedPR models.PullRequestShort) (models.PRResp
 	if !ok {
 		iPR, err, ok = database.GetPRFromDB(ctx, bindedPR.PullRequestID)
 		if err != nil {
-			return models.PRResponse{}, errs.ErrNoCandidate //вернуть 500
+			return models.PRResponse{}, errs.ErrDatabase
 		}
 		if !ok {
 			return models.PRResponse{}, errs.ErrNotFound
@@ -93,7 +93,7 @@ func Merge(ctx context.Context, bindedPR models.PullRequestShort) (models.PRResp
 	cache.PRcache.Set(bindedPR.PullRequestID, req)
 	err = database.SetPRToDB(ctx, req)
 	if err != nil {
-		return models.PRResponse{}, errs.ErrPRExists //вернуть 500
+		return models.PRResponse{}, errs.ErrDatabase
 	}
 	return models.PRResponse{PullRequest: req}, nil
 }
@@ -104,7 +104,7 @@ func Reassign(ctx context.Context, bindedPR models.PRReassign) (models.PRReassig
 	if !ok {
 		iPR, err, ok = database.GetPRFromDB(ctx, bindedPR.PullRequestID)
 		if err != nil {
-			return models.PRReassignResponse{}, errs.ErrNoCandidate //вернуть 500
+			return models.PRReassignResponse{}, errs.ErrDatabase
 		}
 		if !ok {
 			return models.PRReassignResponse{}, errs.ErrNotFound
@@ -115,11 +115,12 @@ func Reassign(ctx context.Context, bindedPR models.PRReassign) (models.PRReassig
 	if !ok {
 		iUser, err, ok = database.GetUserFromDB(ctx, bindedPR.OldReviewerID)
 		if err != nil {
-			return models.PRReassignResponse{}, errs.ErrNoCandidate //вернуть 500
+			return models.PRReassignResponse{}, errs.ErrDatabase
 		}
 		if !ok {
 			return models.PRReassignResponse{}, errs.ErrNotFound
 		}
+		cache.UserCache.Set(bindedPR.OldReviewerID, iUser.(models.User))
 	}
 	reviewer := iUser.(models.User)
 
@@ -145,8 +146,9 @@ func Reassign(ctx context.Context, bindedPR models.PRReassign) (models.PRReassig
 	if !ok {
 		iTeam, err, ok = database.GetTeamFromDB(ctx, reviewer.TeamName)
 		if err != nil || !ok {
-			return models.PRReassignResponse{}, errs.ErrPRExists //вернуть 500
+			return models.PRReassignResponse{}, errs.ErrDatabase
 		}
+		cache.TeamCache.Set(reviewer.TeamName, iTeam.(models.Team))
 	}
 	reqTeam := iTeam.(models.Team)
 
@@ -159,7 +161,7 @@ func Reassign(ctx context.Context, bindedPR models.PRReassign) (models.PRReassig
 			cache.PRcache.Set(bindedPR.PullRequestID, req)
 			err = database.SetPRToDB(ctx, req)
 			if err != nil {
-				return models.PRReassignResponse{}, errs.ErrPRExists //вернуть 500
+				return models.PRReassignResponse{}, errs.ErrDatabase
 			}
 			return models.PRReassignResponse{PullRequest: req, ReplacedBy: reviewer.UserID}, nil
 		}
@@ -170,16 +172,7 @@ func Reassign(ctx context.Context, bindedPR models.PRReassign) (models.PRReassig
 func GetPR(ctx context.Context, UserID string) models.UserRequests {
 	res, err := database.GetPRFromDBByUser(ctx, UserID)
 	if err != nil {
-		return models.UserRequests{UserID: UserID, PullRequests: []models.PullRequestShort{}} //вернуть 500
+		return models.UserRequests{UserID: UserID, PullRequests: []models.PullRequestShort{}}
 	}
 	return res
-}
-
-func PrToPrShort(PR models.PullRequest) models.PullRequestShort {
-	return models.PullRequestShort{
-		PullRequestID:   PR.PullRequestID,
-		PullRequestName: PR.PullRequestName,
-		AuthorID:        PR.AuthorID,
-		Status:          PR.Status,
-	}
 }

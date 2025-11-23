@@ -10,7 +10,6 @@ var UserCache lruCache
 var TeamCache lruCache
 var PRcache lruCache
 
-// node in LRU list
 type lruNode struct {
 	key   string
 	value interface{}
@@ -18,7 +17,6 @@ type lruNode struct {
 	next  *lruNode
 }
 
-// simple LRU cache for orders
 type lruCache struct {
 	capacity int
 	store    map[string]*lruNode
@@ -27,7 +25,6 @@ type lruCache struct {
 	mu       sync.Mutex
 }
 
-// constructor
 func NewOrderCache(cap int) lruCache {
 	return lruCache{
 		capacity: cap,
@@ -35,13 +32,11 @@ func NewOrderCache(cap int) lruCache {
 	}
 }
 
-// move node to front (most recently used)
 func (c *lruCache) moveToFront(node *lruNode) {
 	if c.head == node {
 		return
 	}
 
-	// unlink node
 	if node.prev != nil {
 		node.prev.next = node.next
 	}
@@ -52,7 +47,6 @@ func (c *lruCache) moveToFront(node *lruNode) {
 		c.tail = node.prev
 	}
 
-	// put node at head
 	node.prev = nil
 	node.next = c.head
 	if c.head != nil {
@@ -65,7 +59,6 @@ func (c *lruCache) moveToFront(node *lruNode) {
 	}
 }
 
-// add new val to cache
 func (c *lruCache) Set(key string, val interface{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -86,7 +79,6 @@ func (c *lruCache) Set(key string, val interface{}) {
 	}
 }
 
-// get val from cache
 func (c *lruCache) Get(key string) (interface{}, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

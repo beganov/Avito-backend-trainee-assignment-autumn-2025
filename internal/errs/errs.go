@@ -5,12 +5,14 @@ import "errors"
 type ErrorCode string
 
 const (
-	CodeTeamExists  ErrorCode = "TEAM_EXISTS"
-	CodePRExists    ErrorCode = "PR_EXISTS"
-	CodePRMerged    ErrorCode = "PR_MERGED"
-	CodeNotAssigned ErrorCode = "NOT_ASSIGNED"
-	CodeNoCandidate ErrorCode = "NO_CANDIDATE"
-	CodeNotFound    ErrorCode = "NOT_FOUND"
+	CodeTeamExists      ErrorCode = "TEAM_EXISTS"
+	CodePRExists        ErrorCode = "PR_EXISTS"
+	CodePRMerged        ErrorCode = "PR_MERGED"
+	CodeNotAssigned     ErrorCode = "NOT_ASSIGNED"
+	CodeNoCandidate     ErrorCode = "NO_CANDIDATE"
+	CodeNotFound        ErrorCode = "NOT_FOUND"
+	CodeValidationError ErrorCode = "VALIDATION_ERROR"
+	CodeDatabaseError   ErrorCode = "DATABASE_ERROR"
 )
 
 var (
@@ -20,6 +22,8 @@ var (
 	ErrNotAssigned = errors.New("reviewer is not assigned to this PR")
 	ErrNoCandidate = errors.New("no active replacement candidate in team")
 	ErrNotFound    = errors.New("resource not found")
+	ErrValidation  = errors.New("invalid input data")
+	ErrDatabase    = errors.New("internal database error")
 )
 
 type ErrorResponse struct {
@@ -58,4 +62,12 @@ func NoCandidate() ErrorResponse {
 
 func NotFound() ErrorResponse {
 	return NewErrorResponse(CodeNotFound, ErrNotFound.Error())
+}
+
+func ValidationError() ErrorResponse {
+	return NewErrorResponse(CodeNoCandidate, ErrValidation.Error())
+}
+
+func DatabaseError() ErrorResponse {
+	return NewErrorResponse(CodeNotFound, ErrDatabase.Error())
 }

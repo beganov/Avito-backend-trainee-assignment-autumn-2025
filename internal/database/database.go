@@ -208,7 +208,7 @@ func SetPRToDB(ctx context.Context, pr models.PullRequest) error {
 		}
 		createdAt = t
 	} else {
-		createdAt = nil // или time.Now() если хочешь текущее время
+		createdAt = nil
 	}
 
 	if pr.MergedAt != "" {

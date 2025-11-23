@@ -10,8 +10,6 @@ import (
 var (
 	PostgresURL string
 
-	HttpAddr string
-
 	CacheCap int
 
 	HttpTimeOut     time.Duration
@@ -23,7 +21,6 @@ var (
 func VarsInit() {
 
 	PostgresURL = os.Getenv("POSTGRES_URL")
-	HttpAddr = os.Getenv("HTTP_ADDR")
 
 	var err error
 	CacheCap, err = strconv.Atoi(os.Getenv("CACHE_CAP"))
