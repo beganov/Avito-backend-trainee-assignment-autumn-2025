@@ -10,9 +10,11 @@ import (
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/models"
 )
 
+// PR status constants
 var MergeStatus = "MERGED"
 var OpenStatus = "OPEN"
 
+// Create creates a new pull request with automatically assigned reviewers
 func Create(ctx context.Context, bindedPR models.PullRequestShort) (models.PRResponse, error) {
 
 	_, ok := cache.PRcache.Get(bindedPR.PullRequestID)
@@ -134,6 +136,7 @@ func Create(ctx context.Context, bindedPR models.PullRequestShort) (models.PRRes
 
 }
 
+// Merge updates a pull request status to MERGED (idempotent operation)
 func Merge(ctx context.Context, bindedPR models.PullRequestShort) (models.PRResponse, error) {
 
 	var err error
@@ -184,6 +187,7 @@ func Merge(ctx context.Context, bindedPR models.PullRequestShort) (models.PRResp
 
 }
 
+// Reassign replaces a reviewer with another active team member
 func Reassign(ctx context.Context, bindedPR models.PRReassign) (models.PRReassignResponse, error) {
 
 	var err error
@@ -314,6 +318,7 @@ func Reassign(ctx context.Context, bindedPR models.PRReassign) (models.PRReassig
 
 }
 
+// GetPR retrieves all pull requests assigned to a user
 func GetPR(ctx context.Context, UserID string) models.UserRequests {
 
 	res, err := database.GetPRFromDBByUser(ctx, UserID)

@@ -6,12 +6,13 @@ import (
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/config"
 )
 
-var UserCache lruCache
+var UserCache lruCache //cache for users
 
-var TeamCache lruCache
+var TeamCache lruCache //cache for teams
 
-var PRcache lruCache
+var PRcache lruCache //cache for PRs
 
+// node in LRU cache
 type lruNode struct {
 	key string
 
@@ -22,6 +23,7 @@ type lruNode struct {
 	next *lruNode
 }
 
+// simple LRU cache
 type lruCache struct {
 	capacity int
 
@@ -34,6 +36,7 @@ type lruCache struct {
 	mu sync.Mutex
 }
 
+// constructor
 func NewOrderCache(cap int) lruCache {
 
 	return lruCache{
@@ -45,6 +48,7 @@ func NewOrderCache(cap int) lruCache {
 
 }
 
+// move node to front (most recently used)
 func (c *lruCache) moveToFront(node *lruNode) {
 
 	if c.head == node {
@@ -53,6 +57,7 @@ func (c *lruCache) moveToFront(node *lruNode) {
 
 	}
 
+	// unlink node
 	if node.prev != nil {
 
 		node.prev.next = node.next
@@ -71,6 +76,7 @@ func (c *lruCache) moveToFront(node *lruNode) {
 
 	}
 
+	// put node at head
 	node.prev = nil
 
 	node.next = c.head
@@ -91,6 +97,7 @@ func (c *lruCache) moveToFront(node *lruNode) {
 
 }
 
+// add new order to cache
 func (c *lruCache) Set(key string, val interface{}) {
 
 	c.mu.Lock()
@@ -103,6 +110,7 @@ func (c *lruCache) Set(key string, val interface{}) {
 
 	c.moveToFront(node)
 
+	// remove LRU if over capacity
 	if len(c.store) > c.capacity {
 
 		delete(c.store, c.tail.key)
@@ -114,7 +122,7 @@ func (c *lruCache) Set(key string, val interface{}) {
 			c.tail.next = nil
 
 		} else {
-
+			// only one node
 			c.head = nil
 
 			c.tail = nil
@@ -125,6 +133,7 @@ func (c *lruCache) Set(key string, val interface{}) {
 
 }
 
+// get order from cache
 func (c *lruCache) Get(key string) (interface{}, bool) {
 
 	c.mu.Lock()
@@ -133,7 +142,7 @@ func (c *lruCache) Get(key string) (interface{}, bool) {
 
 	if node, ok := c.store[key]; ok {
 
-		c.moveToFront(node)
+		c.moveToFront(node) // mark as recently used
 
 		return node.value, true
 

@@ -16,11 +16,12 @@ var (
 	DB *pgxpool.Pool
 )
 
+// InitDB initializes the database connection pool
 func InitDB(ctx context.Context, dsn string) {
 
 	var err error
 
-	DB, err = pgxpool.New(ctx, dsn)
+	DB, err = pgxpool.New(ctx, dsn) // Create connection pool
 
 	if err != nil {
 
@@ -28,7 +29,7 @@ func InitDB(ctx context.Context, dsn string) {
 
 	}
 
-	if err := DB.Ping(ctx); err != nil {
+	if err := DB.Ping(ctx); err != nil { // Verify database connectivity
 
 		logger.Fatal(err, "unable to connect to DB")
 
@@ -36,9 +37,10 @@ func InitDB(ctx context.Context, dsn string) {
 
 }
 
+// run goose migrations
 func RunMigrations(dsn string) {
 
-	DB, err := sql.Open("postgres", dsn)
+	DB, err := sql.Open("postgres", dsn) // Open database connection for migrations
 
 	if err != nil {
 
@@ -48,7 +50,7 @@ func RunMigrations(dsn string) {
 
 	defer DB.Close()
 
-	if err := goose.Up(DB, config.MigrationPath); err != nil {
+	if err := goose.Up(DB, config.MigrationPath); err != nil { // Run all up migrations
 
 		logger.Fatal(err, "failed to run migrations")
 

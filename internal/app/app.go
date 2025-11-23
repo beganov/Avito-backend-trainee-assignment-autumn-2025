@@ -10,14 +10,14 @@ import (
 
 func Init() {
 
-	if err := godotenv.Load(); err != nil {
+	if err := godotenv.Load(); err != nil { // Load environment variables from .env file
 
 		logger.Fatal(err, "No .env file found")
 
 	}
 
-	metrics.Init()
+	metrics.Init() // Initialize Prometheus metrics collectors
 
-	config.VarsInit()
+	config.VarsInit() // Load and validate configuration from environment variables
 
 }

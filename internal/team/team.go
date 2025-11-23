@@ -10,6 +10,7 @@ import (
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/models"
 )
 
+// Get a team and its members by team name
 func Get(TeamName string, ctx context.Context) (models.Team, error) {
 
 	resTeam, ok := cache.TeamCache.Get(TeamName)
@@ -42,6 +43,7 @@ func Get(TeamName string, ctx context.Context) (models.Team, error) {
 
 }
 
+// Add a team by team name
 func Add(bindedTeam models.Team, ctx context.Context) (models.TeamResponse, error) {
 
 	_, ok := cache.TeamCache.Get(bindedTeam.TeamName)

@@ -9,15 +9,16 @@ import (
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/models"
 )
 
+// GetTeamFromDB retrieves a team and its members from the database by team name
 func GetTeamFromDB(ctx context.Context, teamName string) (models.Team, error, bool) {
 
-	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut)
+	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut) // Create context with timeout
 
 	defer cancel()
 
 	var err error
 
-	if DB == nil {
+	if DB == nil { // Check if database connection is initialized
 
 		err = fmt.Errorf("database not initialized")
 
@@ -31,6 +32,7 @@ func GetTeamFromDB(ctx context.Context, teamName string) (models.Team, error, bo
 
 	team.TeamName = teamName
 
+	// Query all users belonging to the specified team
 	rows, err := DB.Query(dbCtx, `
 
         SELECT u.user_id, u.username, u.is_active 
@@ -51,6 +53,7 @@ func GetTeamFromDB(ctx context.Context, teamName string) (models.Team, error, bo
 
 	defer rows.Close()
 
+	// Process each team member and add to the team structure
 	for rows.Next() {
 
 		var user models.User
@@ -75,11 +78,12 @@ func GetTeamFromDB(ctx context.Context, teamName string) (models.Team, error, bo
 
 }
 
+// SetTeamToDB creates or updates a team and all its members in the database
 func SetTeamToDB(ctx context.Context, team models.Team) error {
 
 	var err error
 
-	if DB == nil {
+	if DB == nil { // Check if database connection is initialized
 
 		err = fmt.Errorf("database not initialized")
 
@@ -89,11 +93,11 @@ func SetTeamToDB(ctx context.Context, team models.Team) error {
 
 	}
 
-	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut)
+	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut) // Create context with timeout
 
 	defer cancel()
 
-	tx, err := DB.Begin(dbCtx)
+	tx, err := DB.Begin(dbCtx) // Begin transaction to ensure team creation/update
 
 	if err != nil {
 
@@ -103,10 +107,11 @@ func SetTeamToDB(ctx context.Context, team models.Team) error {
 
 	}
 
-	defer tx.Rollback(dbCtx)
+	defer tx.Rollback(dbCtx) // Ensure rollback if transaction fails
 
 	var teamID int
 
+	// Insert or update team, returning the team_id for user associations
 	err = tx.QueryRow(dbCtx, `
 
         INSERT INTO teams (team_name) 
@@ -125,6 +130,7 @@ func SetTeamToDB(ctx context.Context, team models.Team) error {
 
 	}
 
+	// Insert or update each team member
 	for _, member := range team.Members {
 
 		_, err := tx.Exec(dbCtx, `
@@ -153,6 +159,7 @@ func SetTeamToDB(ctx context.Context, team models.Team) error {
 
 	}
 
+	// Commit transaction
 	return tx.Commit(dbCtx)
 
 }

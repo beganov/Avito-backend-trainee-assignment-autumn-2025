@@ -14,15 +14,16 @@ import (
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/models"
 )
 
+// GetPRFromDB retrieves a pull request from the database by its ID
 func GetPRFromDB(ctx context.Context, prID string) (models.PullRequest, error, bool) {
 
-	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut)
+	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut) // Create context with timeout
 
 	defer cancel()
 
 	var err error
 
-	if DB == nil {
+	if DB == nil { // Check if database connection is initialized
 
 		err = fmt.Errorf("database not initialized")
 
@@ -36,6 +37,7 @@ func GetPRFromDB(ctx context.Context, prID string) (models.PullRequest, error, b
 
 	var createdAt, mergedAt sql.NullTime
 
+	// Query pull request from database
 	err = DB.QueryRow(dbCtx, `
 
         SELECT pull_request_id, pull_request_name, author_id, status, 
@@ -52,7 +54,7 @@ func GetPRFromDB(ctx context.Context, prID string) (models.PullRequest, error, b
 
 	if err != nil {
 
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) { // Return not found without error if PR doesn't exist
 
 			return models.PullRequest{}, nil, false
 
@@ -64,6 +66,7 @@ func GetPRFromDB(ctx context.Context, prID string) (models.PullRequest, error, b
 
 	}
 
+	// Convert nullable timestamps to string format
 	if createdAt.Valid {
 
 		pr.CreatedAt = createdAt.Time.Format(time.RFC3339)
@@ -80,11 +83,12 @@ func GetPRFromDB(ctx context.Context, prID string) (models.PullRequest, error, b
 
 }
 
+// SetPRToDB inserts or updates a pull request in the database
 func SetPRToDB(ctx context.Context, pr models.PullRequest) error {
 
 	var err error
 
-	if DB == nil {
+	if DB == nil { // Check if database connection is initialized
 
 		err = fmt.Errorf("database not initialized")
 
@@ -94,11 +98,11 @@ func SetPRToDB(ctx context.Context, pr models.PullRequest) error {
 
 	}
 
-	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut)
+	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut) // Create context with timeout
 
 	defer cancel()
 
-	var createdAt, mergedAt interface{}
+	var createdAt, mergedAt interface{} // Prepare timestamp fields for database
 
 	if pr.CreatedAt != "" {
 
@@ -140,6 +144,7 @@ func SetPRToDB(ctx context.Context, pr models.PullRequest) error {
 
 	}
 
+	// Execute UPSERT query - insert new PR or update existing one
 	_, err = DB.Exec(dbCtx, `
 
         INSERT INTO pull_requests 

@@ -12,11 +12,12 @@ import (
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/models"
 )
 
+// GetPRFromDBByUser retrieves all pull requests where the specified user is assigned as a reviewer
 func GetPRFromDBByUser(ctx context.Context, userID string) (models.UserRequests, error) {
 
 	var err error
 
-	if DB == nil {
+	if DB == nil { // Check if database connection is initialized
 
 		err = fmt.Errorf("database not initialized")
 
@@ -26,7 +27,7 @@ func GetPRFromDBByUser(ctx context.Context, userID string) (models.UserRequests,
 
 	}
 
-	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut)
+	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut) // Create context with timeout
 
 	defer cancel()
 
@@ -34,6 +35,7 @@ func GetPRFromDBByUser(ctx context.Context, userID string) (models.UserRequests,
 
 	userRequests.UserID = userID
 
+	// Query all PRs where the user is in the assigned_reviewers JSONB array
 	rows, err := DB.Query(dbCtx, `
 
         SELECT pr.pull_request_id, pr.pull_request_name, pr.author_id, pr.status
@@ -54,6 +56,7 @@ func GetPRFromDBByUser(ctx context.Context, userID string) (models.UserRequests,
 
 	defer rows.Close()
 
+	// Process each PR and add to the user's request list
 	for rows.Next() {
 
 		var pr models.PullRequestShort
@@ -78,15 +81,16 @@ func GetPRFromDBByUser(ctx context.Context, userID string) (models.UserRequests,
 
 }
 
+// GetUserFromDB retrieves a user from the database by user ID
 func GetUserFromDB(ctx context.Context, userID string) (models.User, error, bool) {
 
-	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut)
+	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut) // Create context with timeout
 
 	defer cancel()
 
 	var err error
 
-	if DB == nil {
+	if DB == nil { // Check if database connection is initialized
 
 		err = fmt.Errorf("database not initialized")
 
@@ -98,6 +102,7 @@ func GetUserFromDB(ctx context.Context, userID string) (models.User, error, bool
 
 	var user models.User
 
+	// Query user with team information
 	err = DB.QueryRow(dbCtx, `
 
         SELECT u.user_id, u.username, u.is_active, t.team_name 
@@ -112,7 +117,7 @@ func GetUserFromDB(ctx context.Context, userID string) (models.User, error, bool
 
 	if err != nil {
 
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) { // Return not found without error if user doesn't exist
 
 			return models.User{}, nil, false
 

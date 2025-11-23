@@ -10,15 +10,16 @@ import (
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/logger"
 )
 
+// LoadCacheFromDB preloads data from database into in-memory cache
 func LoadCacheFromDB(ctx context.Context) error {
 
-	cache.InitCache()
+	cache.InitCache() // Initialize cache instances
 
-	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut)
+	dbCtx, cancel := context.WithTimeout(ctx, config.PostgresTimeOut) // Create context with timeout
 
 	defer cancel()
 
-	rows, err := database.DB.Query(dbCtx, `SELECT team_name FROM teams`)
+	rows, err := database.DB.Query(dbCtx, `SELECT team_name FROM teams`) // Load all teams from database into cache
 
 	if err != nil {
 
@@ -56,7 +57,7 @@ func LoadCacheFromDB(ctx context.Context) error {
 
 	}
 
-	userRows, err := database.DB.Query(dbCtx, `SELECT user_id FROM users`)
+	userRows, err := database.DB.Query(dbCtx, `SELECT user_id FROM users`) // Load all users from database into cache
 
 	if err != nil {
 
@@ -94,7 +95,7 @@ func LoadCacheFromDB(ctx context.Context) error {
 
 	}
 
-	prRows, err := database.DB.Query(dbCtx, `SELECT pull_request_id FROM pull_requests`)
+	prRows, err := database.DB.Query(dbCtx, `SELECT pull_request_id FROM pull_requests`) // Load all pr from database into cache
 
 	if err != nil {
 

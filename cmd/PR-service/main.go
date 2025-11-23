@@ -43,22 +43,21 @@ func main() {
 
 	defer cancel()
 
-	app.Init()
+	app.Init() // Initialize  components (dotenv, config, metrics)
 
-	database.RunMigrations(config.PostgresURL)
+	database.RunMigrations(config.PostgresURL) // Run database migrations
 
-	database.InitDB(ctx, config.PostgresURL)
+	database.InitDB(ctx, config.PostgresURL) // Initialize database connection
 
 	defer database.DB.Close()
 
-	err := app.LoadCacheFromDB(ctx)
+	err := app.LoadCacheFromDB(ctx) // Load data from database into cache
 
 	if err != nil {
-		logger.Error(err, "cache dont loaded")
-
+		logger.Error(err, "cache dont loaded") // if cache load error - work continue
 	}
 
-	e := app.StartServer(ctx)
+	e := app.StartServer(ctx) // Setup and configure HTTP server
 
 	go func() {
 
@@ -70,8 +69,8 @@ func main() {
 
 	}()
 
-	<-ctx.Done()
+	<-ctx.Done() // Wait for shutdown signal (SIGINT, SIGTERM)
 
-	app.GracefulShutdown(e, database.DB)
+	app.GracefulShutdown(e, database.DB) // Graceful shutdown
 
 }

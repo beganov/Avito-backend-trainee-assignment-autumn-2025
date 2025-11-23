@@ -10,6 +10,7 @@ import (
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/metrics"
 )
 
+// Handler manages HTTP request handlers for the PR review service
 type Handler struct {
 	ctx context.Context
 }
@@ -36,7 +37,7 @@ func NewHandler(ctx context.Context) *Handler {
 
 func (h *Handler) Health(c echo.Context) error {
 
-	timer := prometheus.NewTimer(metrics.HttpDuration)
+	timer := prometheus.NewTimer(metrics.HttpDuration) // Start timer for metrics collection
 
 	defer timer.ObserveDuration()
 
