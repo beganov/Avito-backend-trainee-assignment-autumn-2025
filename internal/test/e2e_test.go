@@ -260,7 +260,7 @@ func TestFullFlow(t *testing.T) {
 
 func TestLoad(t *testing.T) {
 
-	const N = 300 // 5 RPS * 60 seconds
+	const N = 300
 
 	const workers = 10
 
