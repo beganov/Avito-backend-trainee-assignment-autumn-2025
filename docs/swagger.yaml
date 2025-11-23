@@ -1,0 +1,341 @@
+basePath: /
+definitions:
+  errs.ErrorCode:
+    enum:
+    - TEAM_EXISTS
+    - PR_EXISTS
+    - PR_MERGED
+    - NOT_ASSIGNED
+    - NO_CANDIDATE
+    - NOT_FOUND
+    - VALIDATION_ERROR
+    - DATABASE_ERROR
+    type: string
+    x-enum-varnames:
+    - CodeTeamExists
+    - CodePRExists
+    - CodePRMerged
+    - CodeNotAssigned
+    - CodeNoCandidate
+    - CodeNotFound
+    - CodeValidationError
+    - CodeDatabaseError
+  errs.ErrorResponse:
+    properties:
+      error:
+        properties:
+          code:
+            $ref: '#/definitions/errs.ErrorCode'
+          message:
+            type: string
+        type: object
+    type: object
+  models.PullRequest:
+    properties:
+      assigned_reviewers:
+        items:
+          type: string
+        type: array
+      author_id:
+        type: string
+      createdAt:
+        type: string
+      mergedAt:
+        type: string
+      pull_request_id:
+        type: string
+      pull_request_name:
+        type: string
+      status:
+        description: OPEN, MERGED
+        type: string
+    type: object
+  models.PullRequestShort:
+    properties:
+      author_id:
+        type: string
+      pull_request_id:
+        type: string
+      pull_request_name:
+        type: string
+      status:
+        description: OPEN, MERGED
+        type: string
+    type: object
+  models.Team:
+    properties:
+      members:
+        items:
+          $ref: '#/definitions/models.TeamMember'
+        type: array
+      team_name:
+        type: string
+    type: object
+  models.TeamMember:
+    properties:
+      is_active:
+        type: boolean
+      user_id:
+        type: string
+      username:
+        type: string
+    type: object
+  models.User:
+    properties:
+      is_active:
+        type: boolean
+      team_name:
+        type: string
+      user_id:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: API для управления командами и пул-реквестами
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: Avito Backend Trainee Assignment API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      description: Проверяет работоспособность сервиса
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: Health check
+      tags:
+      - health
+  /pullRequest/create:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные пул-реквеста
+        in: body
+        name: pr
+        required: true
+        schema:
+          properties:
+            author_id:
+              type: string
+            pull_request_id:
+              type: string
+            pull_request_name:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: PR создан
+          schema:
+            properties:
+              pr:
+                $ref: '#/definitions/models.PullRequest'
+            type: object
+        "404":
+          description: Автор/команда не найдены
+          schema:
+            $ref: '#/definitions/errs.ErrorResponse'
+        "409":
+          description: PR уже существует
+          schema:
+            $ref: '#/definitions/errs.ErrorResponse'
+      summary: Создать PR и автоматически назначить до 2 ревьюверов из команды автора
+      tags:
+      - PullRequests
+  /pullRequest/merge:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID пул-реквеста
+        in: body
+        name: pr
+        required: true
+        schema:
+          properties:
+            pull_request_id:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: PR в состоянии MERGED
+          schema:
+            properties:
+              pr:
+                $ref: '#/definitions/models.PullRequest'
+            type: object
+        "404":
+          description: PR не найден
+          schema:
+            $ref: '#/definitions/errs.ErrorResponse'
+      summary: Пометить PR как MERGED (идемпотентная операция)
+      tags:
+      - PullRequests
+  /pullRequest/reassign:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные для переназначения
+        in: body
+        name: reassignment
+        required: true
+        schema:
+          properties:
+            old_user_id:
+              type: string
+            pull_request_id:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Переназначение выполнено
+          schema:
+            properties:
+              pr:
+                $ref: '#/definitions/models.PullRequest'
+              replaced_by:
+                type: string
+            type: object
+        "404":
+          description: PR или пользователь не найден
+          schema:
+            $ref: '#/definitions/errs.ErrorResponse'
+        "409":
+          description: Нарушение доменных правил переназначения
+          schema:
+            $ref: '#/definitions/errs.ErrorResponse'
+      summary: Переназначить конкретного ревьювера на другого из его команды
+      tags:
+      - PullRequests
+  /team/add:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные команды
+        in: body
+        name: team
+        required: true
+        schema:
+          $ref: '#/definitions/models.Team'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Команда создана
+          schema:
+            properties:
+              team:
+                $ref: '#/definitions/models.Team'
+            type: object
+        "400":
+          description: Команда уже существует
+          schema:
+            $ref: '#/definitions/errs.ErrorResponse'
+      summary: Создать команду с участниками (создаёт/обновляет пользователей)
+      tags:
+      - Teams
+  /team/get:
+    get:
+      parameters:
+      - description: Уникальное имя команды
+        in: query
+        name: team_name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Объект команды
+          schema:
+            $ref: '#/definitions/models.Team'
+        "404":
+          description: Команда не найдена
+          schema:
+            $ref: '#/definitions/errs.ErrorResponse'
+      summary: Получить команду с участниками
+      tags:
+      - Teams
+  /users/getReview:
+    get:
+      parameters:
+      - description: Идентификатор пользователя
+        in: query
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Список PR'ов пользователя
+          schema:
+            properties:
+              pull_requests:
+                items:
+                  $ref: '#/definitions/models.PullRequestShort'
+                type: array
+              user_id:
+                type: string
+            type: object
+      summary: Получить PR'ы, где пользователь назначен ревьювером
+      tags:
+      - Users
+  /users/setIsActive:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные активности пользователя
+        in: body
+        name: user
+        required: true
+        schema:
+          properties:
+            is_active:
+              type: boolean
+            user_id:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Обновлённый пользователь
+          schema:
+            properties:
+              user:
+                $ref: '#/definitions/models.User'
+            type: object
+        "404":
+          description: Пользователь не найден
+          schema:
+            $ref: '#/definitions/errs.ErrorResponse'
+      summary: Установить флаг активности пользователя
+      tags:
+      - Users
+produces:
+- application/json
+schemes:
+- http
+swagger: "2.0"

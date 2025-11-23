@@ -65,9 +65,9 @@ func NotFound() ErrorResponse {
 }
 
 func ValidationError() ErrorResponse {
-	return NewErrorResponse(CodeNoCandidate, ErrValidation.Error())
+	return NewErrorResponse(CodeValidationError, ErrValidation.Error())
 }
 
 func DatabaseError() ErrorResponse {
-	return NewErrorResponse(CodeNotFound, ErrDatabase.Error())
+	return NewErrorResponse(CodeDatabaseError, ErrDatabase.Error())
 }

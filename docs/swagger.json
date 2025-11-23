@@ -1,0 +1,521 @@
+{
+    "produces": [
+        "application/json"
+    ],
+    "schemes": [
+        "http"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "API для управления командами и пул-реквестами",
+        "title": "Avito Backend Trainee Assignment API",
+        "contact": {
+            "name": "API Support",
+            "url": "http://www.swagger.io/support",
+            "email": "support@swagger.io"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/health": {
+            "get": {
+                "description": "Проверяет работоспособность сервиса",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/pullRequest/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "PullRequests"
+                ],
+                "summary": "Создать PR и автоматически назначить до 2 ревьюверов из команды автора",
+                "parameters": [
+                    {
+                        "description": "Данные пул-реквеста",
+                        "name": "pr",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "author_id": {
+                                    "type": "string"
+                                },
+                                "pull_request_id": {
+                                    "type": "string"
+                                },
+                                "pull_request_name": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "PR создан",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "pr": {
+                                    "$ref": "#/definitions/models.PullRequest"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Автор/команда не найдены",
+                        "schema": {
+                            "$ref": "#/definitions/errs.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "PR уже существует",
+                        "schema": {
+                            "$ref": "#/definitions/errs.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pullRequest/merge": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "PullRequests"
+                ],
+                "summary": "Пометить PR как MERGED (идемпотентная операция)",
+                "parameters": [
+                    {
+                        "description": "ID пул-реквеста",
+                        "name": "pr",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "pull_request_id": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "PR в состоянии MERGED",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "pr": {
+                                    "$ref": "#/definitions/models.PullRequest"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PR не найден",
+                        "schema": {
+                            "$ref": "#/definitions/errs.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pullRequest/reassign": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "PullRequests"
+                ],
+                "summary": "Переназначить конкретного ревьювера на другого из его команды",
+                "parameters": [
+                    {
+                        "description": "Данные для переназначения",
+                        "name": "reassignment",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "old_user_id": {
+                                    "type": "string"
+                                },
+                                "pull_request_id": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Переназначение выполнено",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "pr": {
+                                    "$ref": "#/definitions/models.PullRequest"
+                                },
+                                "replaced_by": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PR или пользователь не найден",
+                        "schema": {
+                            "$ref": "#/definitions/errs.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Нарушение доменных правил переназначения",
+                        "schema": {
+                            "$ref": "#/definitions/errs.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/team/add": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Teams"
+                ],
+                "summary": "Создать команду с участниками (создаёт/обновляет пользователей)",
+                "parameters": [
+                    {
+                        "description": "Данные команды",
+                        "name": "team",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.Team"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Команда создана",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "team": {
+                                    "$ref": "#/definitions/models.Team"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Команда уже существует",
+                        "schema": {
+                            "$ref": "#/definitions/errs.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/team/get": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Teams"
+                ],
+                "summary": "Получить команду с участниками",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Уникальное имя команды",
+                        "name": "team_name",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Объект команды",
+                        "schema": {
+                            "$ref": "#/definitions/models.Team"
+                        }
+                    },
+                    "404": {
+                        "description": "Команда не найдена",
+                        "schema": {
+                            "$ref": "#/definitions/errs.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/getReview": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Получить PR'ы, где пользователь назначен ревьювером",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Идентификатор пользователя",
+                        "name": "user_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Список PR'ов пользователя",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "pull_requests": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/definitions/models.PullRequestShort"
+                                    }
+                                },
+                                "user_id": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/users/setIsActive": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Установить флаг активности пользователя",
+                "parameters": [
+                    {
+                        "description": "Данные активности пользователя",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "is_active": {
+                                    "type": "boolean"
+                                },
+                                "user_id": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Обновлённый пользователь",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "user": {
+                                    "$ref": "#/definitions/models.User"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
+                        "schema": {
+                            "$ref": "#/definitions/errs.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "errs.ErrorCode": {
+            "type": "string",
+            "enum": [
+                "TEAM_EXISTS",
+                "PR_EXISTS",
+                "PR_MERGED",
+                "NOT_ASSIGNED",
+                "NO_CANDIDATE",
+                "NOT_FOUND",
+                "VALIDATION_ERROR",
+                "DATABASE_ERROR"
+            ],
+            "x-enum-varnames": [
+                "CodeTeamExists",
+                "CodePRExists",
+                "CodePRMerged",
+                "CodeNotAssigned",
+                "CodeNoCandidate",
+                "CodeNotFound",
+                "CodeValidationError",
+                "CodeDatabaseError"
+            ]
+        },
+        "errs.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "object",
+                    "properties": {
+                        "code": {
+                            "$ref": "#/definitions/errs.ErrorCode"
+                        },
+                        "message": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "models.PullRequest": {
+            "type": "object",
+            "properties": {
+                "assigned_reviewers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "author_id": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "mergedAt": {
+                    "type": "string"
+                },
+                "pull_request_id": {
+                    "type": "string"
+                },
+                "pull_request_name": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "OPEN, MERGED",
+                    "type": "string"
+                }
+            }
+        },
+        "models.PullRequestShort": {
+            "type": "object",
+            "properties": {
+                "author_id": {
+                    "type": "string"
+                },
+                "pull_request_id": {
+                    "type": "string"
+                },
+                "pull_request_name": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "OPEN, MERGED",
+                    "type": "string"
+                }
+            }
+        },
+        "models.Team": {
+            "type": "object",
+            "properties": {
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TeamMember"
+                    }
+                },
+                "team_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.TeamMember": {
+            "type": "object",
+            "properties": {
+                "is_active": {
+                    "type": "boolean"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.User": {
+            "type": "object",
+            "properties": {
+                "is_active": {
+                    "type": "boolean"
+                },
+                "team_name": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

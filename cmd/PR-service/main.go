@@ -1,3 +1,21 @@
+// @title Avito Backend Trainee Assignment API
+// @version 1.0
+// @description API для управления командами и пул-реквестами
+
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @contact.email support@swagger.io
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host localhost:8080
+// @BasePath /
+// @schemes http
+
+// @produce json
+// @consumes json
+
 package main
 
 import (
@@ -11,25 +29,29 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/docs"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/api"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/cache"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/config"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/database"
+	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/logger"
 	"github.com/beganov/Avito-backend-trainee-assignment-autumn-2025/internal/metrics"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	logger.Init("info")
+
 	if err := godotenv.Load(); err != nil {
-		log.Fatal(err, "No .env file found")
-		// logger.Fatal(err, "No .env file found")
+		logger.Fatal(err, "No .env file found")
 	}
 	metrics.Init()
 	config.VarsInit()
@@ -51,7 +73,6 @@ func main() {
 	// Middleware
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-
 	// Routes
 	e.POST("/team/add", handler.AddTeam)
 	e.GET("/team/get", handler.GetTeam)
@@ -63,12 +84,9 @@ func main() {
 	e.POST("/pullRequest/merge", handler.MergePullRequest)
 	e.POST("/pullRequest/reassign", handler.ReassignPullRequest)
 
+	e.GET("/health", handler.Health)
 	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
-	e.GET("/health", func(c echo.Context) error {
-		return c.JSON(200, map[string]string{"status": "OK"})
-	})
-
-	// Start server
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
 	go func() {
 		if err := e.Start(":8080"); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("failed to start server", "error", err)
@@ -87,8 +105,7 @@ func handleSignals(cancel context.CancelFunc) {
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 		sig := <-c
-		log.Print("Caught signal", sig)
-		//log.Info("Caught signal", sig)
+		logger.Info("Caught signal", sig)
 		cancel()
 	}()
 }
@@ -98,8 +115,7 @@ func gracefulShutdown(e *echo.Echo, db *pgxpool.Pool) {
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {
-		log.Print(err, "HTTP server shutdown failed")
-		//log.Error(err, "HTTP server shutdown failed")
+		logger.Error(err, "HTTP server shutdown failed")
 	}
 	db.Close()
 	log.Print("All services stopped")
@@ -111,7 +127,7 @@ func LoadCacheFromDB(ctx context.Context) error {
 
 	rows, err := database.DB.Query(dbCtx, `SELECT team_name FROM teams`)
 	if err != nil {
-		log.Printf("failed to load teams for cache: %v", err)
+		logger.Info("failed to load teams for cache: %v", err)
 		return err
 	}
 	defer rows.Close()
@@ -119,13 +135,13 @@ func LoadCacheFromDB(ctx context.Context) error {
 	for rows.Next() {
 		var teamName string
 		if err := rows.Scan(&teamName); err != nil {
-			log.Printf("failed to scan team name: %v", err)
+			logger.Info("failed to scan team name: %v", err)
 			continue
 		}
 
 		team, err, _ := database.GetTeamFromDB(dbCtx, teamName)
 		if err != nil {
-			log.Printf("failed to load team %s: %v", teamName, err)
+			logger.Info("failed to load team %s: %v", teamName, err)
 			continue
 		}
 		cache.TeamCache.Set(teamName, team)
